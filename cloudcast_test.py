@@ -78,12 +78,12 @@ TestCloud.nc
 # print(read_data)
 # os._exit(1)
 
-##
-# Remove cloud-free land, cloud-free sea, snow over land and sea ice
-read_data = read_data.where(read_data > 4)
-
 # Pre-processing to match cloud types in paper
 # -------------------------------------------
+
+##
+# Remove classes 1, 2, 3 and 4, which are cloud-free land, cloud-free sea, snow over land and sea ice.
+read_data = read_data.where(read_data > 4)
 
 ##
 # Subtract 4 to correspond to paper cloud types
@@ -178,3 +178,7 @@ else:
 ##
 # Show or save plot
 plt.show()
+
+# >>>> ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: <<<<
+# >>>> END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE <<<<
+# >>>> ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: <<<<
