@@ -33,7 +33,7 @@ __docformat__ = "Numpydoc"
 ###############################################################################
 # PUBLIC nat2tif()
 # ----------------
-def nat2tif(file: str, calibration: str, area_def: pr.geometry.AreaDefinition, dataset: str, reader: str, outdir: str, label: str, dtype: str, radius: int, epsilon: float, nodata: float):
+def nat2tif(file: str, calibration: str, area_def: pr.geometry.AreaDefinition, dataset: str, reader: str, outdir: str, label: str, dtype: str, radius: int, epsilon: float, nodata: float, to_cog_tif: bool, to_spain: bool):
     ##
     # Open the file w/ satpy, which uses Xarray
     scn = Scene(filenames = {reader: [file]})
@@ -82,7 +82,9 @@ def nat2tif(file: str, calibration: str, area_def: pr.geometry.AreaDefinition, d
     ##
     # Join our filename based on the input file's basename
     outname = os.path.join(outdir, os.path.basename(file)[:-4] + "_" + str(label) + ".tif")
-    outname = outname.replace(".tif", '_spain.tif' if as_spain else '.tif')
+    outname = outname.replace(".tif", '_spain.tif' if to_spain else '.tif')
+    if to_cog_tif:
+       outname.replace(".tif", "_cog.tif")
 
     ##
     # Define some metadata
@@ -95,8 +97,13 @@ def nat2tif(file: str, calibration: str, area_def: pr.geometry.AreaDefinition, d
 
     ##
     # Create the file
-    driver = gdal.GetDriverByName("GTiff")
+    if to_cog_tif:
+        driver = gdal.GetDriverByName("COG")
+    else:
+        driver = gdal.GetDriverByName("GTiff")
+    print(driver)
     outRaster = driver.Create(outname, cols, rows, 1)
+    print(dir(outRaster))
 
     ##
     # Save the metadata

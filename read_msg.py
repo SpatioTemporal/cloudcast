@@ -3,6 +3,55 @@
 r"""
 Read/Convert Meteosat Second Generation (MSG) Native Archive Format (.nat) file to GTiff and make image.
 
+$ gdalinfo MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA_HRV.tif
+
+    Driver: GTiff/GeoTIFF
+    Files: MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA_HRV.tif
+    Size is 768, 768
+    Coordinate System is:
+    GEOGCRS["WGS 84",
+        ENSEMBLE["World Geodetic System 1984 ensemble",
+            MEMBER["World Geodetic System 1984 (Transit)"],
+            MEMBER["World Geodetic System 1984 (G730)"],
+            MEMBER["World Geodetic System 1984 (G873)"],
+            MEMBER["World Geodetic System 1984 (G1150)"],
+            MEMBER["World Geodetic System 1984 (G1674)"],
+            MEMBER["World Geodetic System 1984 (G1762)"],
+            MEMBER["World Geodetic System 1984 (G2139)"],
+            MEMBER["World Geodetic System 1984 (G2296)"],
+            ELLIPSOID["WGS 84",6378137,298.257223563,
+                LENGTHUNIT["metre",1]],
+            ENSEMBLEACCURACY[2.0]],
+        PRIMEM["Greenwich",0,
+            ANGLEUNIT["degree",0.0174532925199433]],
+        CS[ellipsoidal,2],
+            AXIS["geodetic latitude (Lat)",north,
+                ORDER[1],
+                ANGLEUNIT["degree",0.0174532925199433]],
+            AXIS["geodetic longitude (Lon)",east,
+                ORDER[2],
+                ANGLEUNIT["degree",0.0174532925199433]],
+        USAGE[
+            SCOPE["Horizontal component of 3D system."],
+            AREA["World."],
+            BBOX[-90,-180,90,180]],
+        ID["EPSG",4326]]
+    Data axis to CRS axis mapping: 2,1
+    Origin = (-855100.436345000052825,-2638000.000000000000000)
+    Pixel Size = (3000.000000000000000,-3000.000000000000000)
+    Metadata:
+      AREA_OR_POINT=Area
+    Image Structure Metadata:
+      INTERLEAVE=BAND
+    Corner Coordinates:
+    Upper Left  ( -855100.436,-2638000.000) (Invalid angle,Invalid angle)
+    Lower Left  ( -855100.436,-4942000.000) (Invalid angle,Invalid angle)
+    Upper Right ( 1448899.564,-2638000.000) (Invalid angle,Invalid angle)
+    Lower Right ( 1448899.564,-4942000.000) (Invalid angle,Invalid angle)
+    Center      (  296899.564,-3790000.000) (Invalid angle,Invalid angle)
+    Band 1 Block=768x10 Type=Byte, ColorInterp=Gray
+      NoData Value=-3.4e+38
+
 read_msg.py
 ~~~~~~~~~~~~
 
@@ -33,99 +82,13 @@ from cloudcast.util.nat2tif import nat2tif
 __docformat__ = "Numpydoc"
 # ------------------------------------------------------------------------------
 
-# ###############################################################################
-# # PUBLIC nat2tif()
-# # ----------------
-# def nat2tif(file, calibration, area_def, dataset, reader, outdir, label, dtype, radius, epsilon, nodata):
-#     ##
-#     # Open the file w/ satpy, which uses Xarray
-#     scn = Scene(filenames = {reader: [file]})
-
-#     ##
-#     # Check the specified data set is actually available
-#     scn_names = scn.all_dataset_names()
-#     if dataset not in scn_names:
-#         raise Exception("Specified dataset is not available.")
-
-#     ##
-#     # Load the data, different calibration can be chosen
-#     scn.load([dataset], calibration=calibration)
-
-#     ##
-#     # Extract the longitude and latitude data
-#     lons, lats = scn[dataset].area.get_lonlats()
-
-#     ##
-#     # Apply a swath definition for our output raster
-#     swath_def = pr.geometry.SwathDefinition(lons=lons, lats=lats)
-
-#     ##
-#     # Extract the data values
-#     values = scn[dataset].values
-
-#     ##
-#     # Change the datatype of the arrays depending on the present data this can be changed
-#     lons = lons.astype(dtype)
-#     lats = lats.astype(dtype)
-#     values = values.astype(dtype)
-
-#     ##
-#     # Resample our data to the area of interest
-#     values = pr.kd_tree.resample_nearest(swath_def, values,
-#                                              area_def,
-#                                              radius_of_influence=radius, # in meters
-#                                              epsilon=epsilon,
-#                                              fill_value=False)
-
-#     ##
-#     # Check if outdir exists, otherwise create it
-#     if not os.path.exists(outdir):
-#         os.makedirs(outdir)
-
-#     ##
-#     # Join our filename based on the input file's basename
-#     outname = os.path.join(outdir, os.path.basename(file)[:-4] + "_" + str(label) + ".tif")
-#     outname = outname.replace(".tif", '_spain.tif' if as_spain else '.tif')
-
-#     ##
-#     # Define some metadata
-#     cols = values.shape[1]
-#     rows = values.shape[0]
-#     pixelWidth = (area_def.area_extent[2] - area_def.area_extent[0]) / cols
-#     pixelHeight = (area_def.area_extent[1] - area_def.area_extent[3]) / rows
-#     originX = area_def.area_extent[0]
-#     originY = area_def.area_extent[3]
-
-#     ##
-#     # Create the file
-#     driver = gdal.GetDriverByName("GTiff")
-#     outRaster = driver.Create(outname, cols, rows, 1)
-
-#     ##
-#     # Save the metadata
-#     outRaster.SetGeoTransform((originX, pixelWidth, 0, originY, 0, pixelHeight))
-
-#     ##
-#     # Create a new band and write the data
-#     outband = outRaster.GetRasterBand(1)
-#     outband.SetNoDataValue(nodata) #specified no data value by user
-#     outband.WriteArray(np.array(values)) # writing the values
-#     outRasterSRS = osr.SpatialReference() # create CRS instance
-#     outRasterSRS.ImportFromEPSG(4326) # get info for EPSG 4326
-#     outRaster.SetProjection(outRasterSRS.ExportToWkt()) # set CRS as WKT
-
-#     ##
-#     # Clean up
-#     outband.FlushCache()
-#     outband = None
-#     outRaster = None
-
-#     return
-
 # Define Global Constants and State Variables
 # -------------------------------------------
-make_tif = [False, True][0]
-read_nat = [False, True][1]
+make_tif = [False, True][1]
+make_cog_tif = [False, True][0]  # COG GTiff isn't directly supported by python GDAL yet....
+if make_tif == make_cog_tif:
+    raise Exception("can't use make_cog_tif and make_tiff simultaneously")
+read_nat = [False, True][0]
 as_spain = [False, True][0]
 
 ##
@@ -137,13 +100,13 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 # Name(s) of MSG data to work with.
 use_dataset = ds_names[0]
 # These are the base cloudcast fields
-use_dataset = ["VIS006", "IR_039", "IR_108", "IR_120"]
+# use_dataset = ["VIS006", "IR_039", "IR_108", "IR_120"]
 
 ##
 # Define path to folder
-FILE_PATH = "/Volumes/val/data/CloudCast/msg/"
+FILE_PATH = "/Volumes/saved/data/CloudCast/msg/"
 BASENAME = ["MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA", "MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA"][1]
-SUB_PATH = f"{FILE_PATH}/{BASENAME}/"
+SUB_PATH = f"{FILE_PATH}{BASENAME}/"
 FNAME = f"{SUB_PATH}{BASENAME}.nat"
 if isinstance(use_dataset, str):
     TNAME = f"{SUB_PATH}{BASENAME}_{use_dataset}{'_spain' if as_spain else ''}.tif"
@@ -292,9 +255,9 @@ if read_nat:
     ##
     # Save as a netcdf
 
-    os._exit(1)
+    #os._exit(1)
 
-if make_tif:
+if make_tif or make_cog_tif:
     ##
     # Read the file
     #   scn = <class 'satpy.scene.Scene'>
@@ -353,13 +316,12 @@ if make_tif:
             dtype = "float32",
             radius = 16000,
             epsilon = .5,
-            nodata = -3.4E+38)
+            nodata = -3.4E+38,
+            to_cog_tif=make_cog_tif, to_spain=as_spain)
 
 ##
 # Plot
 ds = gdal.Open(TNAME)
-
-os._exit(1)
 
 band = ds.GetRasterBand(1)
 data = band.ReadAsArray()
