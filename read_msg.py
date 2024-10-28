@@ -20,7 +20,7 @@ $ gdalinfo MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA_HRV.tif
             MEMBER["World Geodetic System 1984 (G2139)"],
             MEMBER["World Geodetic System 1984 (G2296)"],
             ELLIPSOID["WGS 84",6378137,298.257223563,
-                LENGTHUNIT["metre",1]],
+            LENGTHUNIT["metre",1]],
             ENSEMBLEACCURACY[2.0]],
         PRIMEM["Greenwich",0,
             ANGLEUNIT["degree",0.0174532925199433]],
@@ -63,13 +63,15 @@ import os
 # Third-Party Imports
 import numpy as np
 from osgeo import gdal
-from osgeo import osr
+# from osgeo import osr
 import pyresample as pr
 #   conda install -c conda-forge satpy
 from satpy import Scene
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+# from rasterio.plot import show
+# from rio_cogeo import cog_validate, cog_info
 
 # STARE Imports
 
@@ -84,12 +86,11 @@ __docformat__ = "Numpydoc"
 
 # Define Global Constants and State Variables
 # -------------------------------------------
-make_tif = [False, True][1]
-make_cog_tif = [False, True][0]  # COG GTiff isn't directly supported by python GDAL yet....
-if make_tif == make_cog_tif:
-    raise Exception("can't use make_cog_tif and make_tiff simultaneously")
+make_tif = [False, True][0]
 read_nat = [False, True][0]
+make_fig = [False, True][1]
 as_spain = [False, True][0]
+as_merc = [False, True][1]
 
 ##
 # From scn.all_dataset_names() below
@@ -104,7 +105,7 @@ use_dataset = ds_names[0]
 
 ##
 # Define path to folder
-FILE_PATH = "/Volumes/saved/data/CloudCast/msg/"
+FILE_PATH = "/Users/mbauer/tmp/CloudCast/msg/"
 BASENAME = ["MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA", "MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA"][1]
 SUB_PATH = f"{FILE_PATH}{BASENAME}/"
 FNAME = f"{SUB_PATH}{BASENAME}.nat"
@@ -115,14 +116,42 @@ else:
     for ds in use_dataset:
         TNAME.append(f"{SUB_PATH}{BASENAME}_{ds}{'_spain' if as_spain else ''}.tif")
 
+
+"""
+https://kylebarron.dev/deck.gl-raster/
+
+"""
+
+# ##
+# # Check GeoTIF
+# gtif_name = "/Volumes/saved/data/CloudCast/msg/MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA_HRV.tif"
+# gtif_cog_name = gtif_name.replace(".tif", "_cog.tif")
+# # $ rio cogeo create /Volumes/saved/data/CloudCast/msg/MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA_HRV.tif /Volumes/saved/data/CloudCast/msg/MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA_HRV_cog.tif
+# # rio_cogeo.create(gtif_name, gtif_cog_name)
+# is_valid, errors, warnings = cog_validate(gtif_cog_name)
+# print(is_valid, errors, warnings)
+# # cog_info(gtif_cog_name)
+
+# os._exit(1)
+
 ##
 # Color map for imaging
-freq_map_cmap = "plasma"
+freq_map_cmap = ["plasma", "gist_ncar_r", "bone_r"][1]
+
 
 ##
 # Define reader (GDAL)
 #   https://satpy.readthedocs.io/en/stable/api/satpy.readers.seviri_l1b_native.html
 reader = "seviri_l1b_native"
+
+##
+# MSG base projection WGS84 - World Geodetic System 1984
+#   https://epsg.io/4326
+MSG_EPSG = 4326
+
+# Geodetic:
+#   A 3D/spherical CRS based on latitude and longitude where geographical distance and coordinates are measured in degrees.
+geod_crs = ccrs.Geodetic()
 
 # The MSG data is provided as Full Disk, meaning that roughly the complete North-South extent of
 #   the globe from the Atlantic to the Indian Ocean is present in each file.
@@ -143,7 +172,7 @@ if as_spain:
     # Calculate the number of pixels
     width = int((urx - llx) / resolution)
     height = int((ury - lly) / resolution)
-    area_extent = (llx,lly,urx,ury)
+    area_extent = (llx, lly, urx, ury)
     ##
     # Define the area
     #   <class 'pyresample.geometry.AreaDefinition'>
@@ -161,9 +190,109 @@ else:
                                           {'lat_0': '90.00', 'lat_ts': '50.00', 'lon_0': '5', 'proj': 'stere', 'ellps': 'WGS84'},
                                           CCAST_HEIGHT, CCAST_WIDTH,
                                           (lower_left_xy[0], lower_left_xy[1], upper_right_xy[0], upper_right_xy[1]))
+    #   +proj=stere +lat_0=90 +lat_ts=50 +lon_0=5 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs +type=crs
+    # print(area_def.proj4_string)
+
     ##
     # Form a cartopy CRS
+    #   <class 'pyresample.utils.cartopy.Projection'>
     CCAST_CRS = area_def.to_cartopy_crs()
+    # print(MERC_CRS.bounds)
+    #   CCAST_CRS.bounds: (-855100.436345, 1448899.563655, -4942000.0, -2638000.0)
+
+    """
+    CCAST_CRS
+        area_def.corners = [
+            (-12.920934886492649, 62.403066090517555), UL
+            (33.73865749382469,   60.15059617915855),  UR
+            (21.32880156090482,   40.92817004367345),  LR
+            (-4.802566482888071,  42.068097533886025)] LL
+
+        area_def.area_extent  (-855100.436345, -4942000.0, 1448899.563655, -2638000.0)
+        CCAST_CRS.bounds      (-855100.436345, 1448899.563655, -4942000.0, -2638000.0)
+
+        lower_left_xy  = [-855100.436345, -4942000.0] => (-4.816534709314307, 42.053336570266744)
+        upper_right_xy = [1448899.563655, -2638000.0] => (33.77742545811928,  60.15622631725923)
+    """
+    # print(area_def.corners)
+    # print(area_def.area_extent)
+    # print(CCAST_CRS.bounds)
+    # ur_xy = geod_crs.transform_point(upper_right_xy[0], upper_right_xy[1], CCAST_CRS)
+    # ll_xy = geod_crs.transform_point(lower_left_xy[0], lower_left_xy[1], CCAST_CRS)
+    # print(f"ll_xy: {ll_xy}")
+    # print(f"ur_xy: {ur_xy}")
+
+    ##
+    # Form a Mercator CSR version of CCAST_CRS
+    use_pseudo = [False, True][0]
+    MERC_EPSG = 3857 if use_pseudo else 3395
+    MERC_CRS = ccrs.epsg(MERC_EPSG)
+    if use_pseudo:
+        ##
+        # Mercator version EPSG:3857 for WGS 84 / Pseudo-Mercator -- Spherical Mercator, Google Maps, OpenStreetMap, Bing, ArcGIS, ESRI
+        #   https://epsg.io/3857
+        area_id = "EPSG:3857"
+        description = "Pseudo-Mercator"
+        proj_id = "EPSG:3857"
+    else:
+        ##
+        # World Mercator version EPSG:3395 for WGS 84
+        #   https://epsg.io/3395
+        area_id = "EPSG:3395"
+        description = "Mercator"
+        proj_id = "EPSG:3395"
+
+    #   ll_xy: (-536174.1912289965, 5140343.824785849)
+    #   ur_xy: (3760085.802305594, 8397504.685448818)
+    ur_xy = MERC_CRS.transform_point(upper_right_xy[0], upper_right_xy[1], CCAST_CRS)
+    ll_xy = MERC_CRS.transform_point(lower_left_xy[0], lower_left_xy[1], CCAST_CRS)
+    # print(f"ll_xy: {ll_xy}")
+    # print(f"ur_xy: {ur_xy}")
+
+    ##
+    # Specify projection parameters
+    if use_pseudo:
+        projection = {'proj': 'merc', 'lat_ts': 0, 'lon_0': 0, 'a': 6378137, 'b': 6378137, 'x_0': 0, 'y_0': 0, 'k': 1, 'units': 'm'}
+    else:
+        projection = {'proj': 'merc','x_0': 0, 'y_0': 0, 'k': 1, 'units': 'm', 'no_defs': None, 'datum': 'WGS84', 'type': 'crs'}
+
+    ##
+    # Define the area
+    merc_area_def = pr.geometry.AreaDefinition(area_id, 'Europe', proj_id,
+                                               projection, CCAST_HEIGHT, CCAST_WIDTH,
+                                               (ll_xy[0], ll_xy[1], ur_xy[0], ur_xy[1]))
+    #   proj4_string: +proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs
+    # print(f"proj4_string: {merc_area_def.proj4_string}")
+
+    MERC_CRS = merc_area_def.to_cartopy_crs()
+
+    """
+    MERC_CRS
+        merc_area_corners = [(-4.7914084331636335, 60.14672953639852),  UL
+                             (33.75229918196862, 60.14672953639852),    UR
+                             (33.75229918196862, 42.06753197287029),    LR
+                             (-4.7914084331636335, 42.06753197287029)]  LL
+
+        merc_area_def.area_extent (-536174.1912289965, 5140343.824785849, 3760085.802305594, 8397504.685448818)
+        MERC_CRS.bounds           (-536174.1912289965, 5140343.824785849, 3760085.802305594, 8397504.685448818)
+
+        ll_xy  = (-536174.1912289965, 5140343.824785849) => (-4.816534709314306, 42.05333657026676)
+        ur_xy  = (3760085.802305594, 8397504.685448818)  => (33.77742545811928, 60.15622631725923)
+    """
+    # print(merc_area_def.corners)
+    # print(merc_area_def.area_extent)
+    # print(MERC_CRS.bounds)
+    # ur_xya = geod_crs.transform_point(ur_xy[0], ur_xy[1], MERC_CRS)
+    # ll_xya = geod_crs.transform_point(ll_xy[0], ll_xy[1], MERC_CRS)
+    # print(f"ll_xy: {ll_xya}")
+    # print(f"ur_xy: {ur_xya}")
+    # os._exit(1)
+
+merc_stuff = (MERC_EPSG, merc_area_def) if as_merc else (None, None)
+
+# use_area_def = [area_def, merc_area_def][int(as_merc)]
+# use_epsg = [MSG_EPSG, MERC_EPSG][int(as_merc)]
+# use_crs = [CCAST_CRS, MERC_CRS][int(as_merc)]
 
 if read_nat:
     ##
@@ -257,7 +386,7 @@ if read_nat:
 
     #os._exit(1)
 
-if make_tif or make_cog_tif:
+if make_tif:
     ##
     # Read the file
     #   scn = <class 'satpy.scene.Scene'>
@@ -306,33 +435,55 @@ if make_tif or make_cog_tif:
 
     ##
     # Convert to GTIFF
-    nat2tif(file = FNAME,
-            calibration = "radiance",
-            area_def = area_def,
-            dataset = use_dataset,
-            reader = reader,
-            outdir = SUB_PATH,
-            label = use_dataset,
-            dtype = "float32",
-            radius = 16000,
-            epsilon = .5,
-            nodata = -3.4E+38,
-            to_cog_tif=make_cog_tif, to_spain=as_spain)
+    nat2tif(file=FNAME, calibration="radiance", area_def=area_def, dataset=use_dataset,
+            reader=reader, outdir=SUB_PATH, label=use_dataset, dtype="float32", radius=16000,
+            epsilon=0.5, nodata=-3.4E+38, use_epsg=MSG_EPSG, merc_vals=merc_stuff, to_spain=as_spain)
 
-##
-# Plot
-ds = gdal.Open(TNAME)
+if make_fig:
+    ##
+    # Plot the tif made by make_tif or in case of as_merc modified with gdal
+    #   $
+    #   <class 'osgeo.gdal.Dataset'>
+    #   ds.GetGeoTransform()  = (-855100.436345, 3000.0, 0.0, -2638000.0, 0.0, -3000.0)
+    #   ds.GetProjection()    = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
 
-band = ds.GetRasterBand(1)
-data = band.ReadAsArray()
-if as_spain:
-    plt.imshow(data)
-else:
-    fig = plt.figure(figsize=(10, 8))
-    ax = plt.axes(projection=CCAST_CRS)
-    a_image = plt.imshow(data, cmap=freq_map_cmap, transform=CCAST_CRS, extent=CCAST_CRS.bounds, origin='upper')
-    ax.add_feature(cfeature.COASTLINE, alpha=0.5)
-plt.show()
+    ds = gdal.Open(TNAME.replace(".tif", "_merc.tif") if as_merc else TNAME)
+    band = ds.GetRasterBand(1)
+    data = band.ReadAsArray()
+    use_extent = MERC_CRS.bounds if as_merc else CCAST_CRS.bounds
+
+    if as_spain:
+        plt.imshow(data)
+    else:
+        fig = plt.figure(figsize=(10, 8))
+        ax = plt.axes(projection=MERC_CRS if as_merc else CCAST_CRS)
+        # a_image = plt.imshow(data, cmap=freq_map_cmap, transform=CCAST_CRS, extent=use_extent, origin='upper')
+        if as_merc:
+            # ax.set_extent(use_extent, crs=geod_crs)
+            a_image = plt.imshow(data, cmap=freq_map_cmap, transform=MERC_CRS, extent=use_extent, origin='upper')
+            ax.set_extent(use_extent, crs=MERC_CRS)
+        else:
+            a_image = plt.imshow(data, cmap=freq_map_cmap, transform=CCAST_CRS, extent=use_extent, origin='upper')
+        ax.add_feature(cfeature.COASTLINE, alpha=1)
+    ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False, linewidth=2, color='black', alpha=0.5, linestyle='--')
+
+    ##
+    # Color bar
+    #   CCAST Sterographic
+    #       values: [0.5235565900802612, ... 13.425487518310547]
+    #   CCAST Mercator
+    #       values: [0.5609534978866577, ... 14.248218536376953]
+    bounds = np.linspace(0.0, 15.0, num=16, endpoint=True)
+    # print(bounds)
+    cbar = fig.colorbar(a_image, location="right", orientation='vertical', extend="neither", ticks=bounds, shrink=0.7 if as_merc else 0.9,
+                        spacing='uniform', fraction=0.15, pad=0.1, aspect=30, drawedges=False,
+                        ax=ax)
+    cbar.ax.tick_params(labelsize=8)
+    cbar.solids.set(alpha=1)
+
+    plt.show()
+
+print("Done")
 
 # >>>> ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: <<<<
 # >>>> END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE <<<<
