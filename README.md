@@ -54,6 +54,8 @@ However, you will find that the Geostationary Projection can't show all of this.
     lons (10213685): [-75.26545715332031 ... 75.56462097167969]
     lats (10213685): [-78.95874786376953 ... 78.29975891113281]
 
+**An important** aspect to keep in mind here is this full disk view does not use interpolation, only re-projection of point to lat/lon.
+
 ![Geostationary Projection](./images/full_frame_Geostationary.png "Geostationary")
 
 #### Partial Disk
@@ -67,20 +69,25 @@ The registration of HRV and non-HRV pixels is done in such a way that the HRV pi
 
 Here I plotted the data from a .nat file. Note where these images are white, but look from the above images to be within the valid data domain, there is either no cloud or no data reported.
 
+**An important** aspect to keep in mind here is like the full disk view, partial disk view the does not use interpolation, only re-projection of point to lat/lon.
+
 ![PlateCarree Projection](./images/full_frame_data_PlateCarree.png "PlateCarree")
 ![Geostationary Projection](./images/full_frame_data_Geostationary.png "Geostationary")
 
 ![PlateCarree Projection](./images/hrv_frame_data_PlateCarree.png "PlateCarree")
 ![Geostationary Projection](./images/hrv_frame_data_Geostationary.png "Geostationary")
 
+----
+
 #### What the docs say
 
-##### Nielsen et al. (2021)
+##### Nielsen et al. (2021) "CloudCast: A Satellite-Based Dataset and Baseline for Forecasting Clouds"
 
     "we start by collecting the 70 080 raw multispectral satellite images from EUMETSAT. These images come from a
     satellite constellation in geostationary orbit centered at zero degrees longitude and arrive in 15-min intervals.
     The resolution is 3712 × 3712 pixels for the full-disk of the Earth, which implies that every pixel corresponds
     to a space of dimensions 3 × 3 km."
+    [Mike's Take: This sounds like they are using the full- and partial-disk data directly.]
 
     "we sample one visible channel, two infrared channels, and one water vapor channel for each observation
     to enable multilayer cloud detection."
@@ -91,26 +98,32 @@ Here I plotted the data from a .nat file. Note where these images are white, but
 
     "In addition to the raw dataset, we also publish a standardized version for future studies, where we center and
     project the final annotated dataset to cover Central Europe, which implies a final resolution of 728 × 728 pixels."
+    [Mike's Take: So the results/classifications are on 728x728.]
 
 ##### CloudCast Tutorial
+    This is linked to form Nielsen et al. (2021)
 
-    "The *CloudCast* dataset contains 70080 images with 11 different cloud types for multiple layers of the atmosphere
-    annotated on a pixel level. The dataset has a spatial resolution of 928 x 1530 pixels recorded with 15-min intervals f
-    or the period 2017-2018, where each pixel represents an area of 3 × 3 km.
+    "The CloudCast dataset contains 70080 images with 11 different cloud types for multiple layers of the atmosphere
+    annotated on a pixel level. The dataset has a spatial resolution of 928 x 1530 pixels recorded with 15-min intervals
+    for the period 2017-2018, where each pixel represents an area of 3 × 3 km."
+    [Mike's Take: This counterdicts Nielsen et al. (2021) who say they use the full- and partial-disk data,
+     although they point to this tutorial.]
 
-    To enable standardized datasets for benchmarking computer vision methods, we include a full-resolution dataset
-    centered and projected dataset over Europe (728 × 728).
+    "To enable standardized datasets for benchmarking computer vision methods, we include a full-resolution dataset
+    centered and projected dataset over Europe (728 × 728)."
+    [Mike's Take: like the results/classifications from Nielsen et al. (2021)]
 
-    To support small-scale experiments and analysis, we also include a downsampled low-resolution dataset
-    128 × 128 (15 × 15 km), which is significantly smaller in size compared to the full dataset.
-    "
+    [Mike's Take: What odd is the CloudCast Tutorial itself doesn't use 728 × 728 results resolution it talks about,
+        but 768 × 768. No where in the CloudCast Tutorial code is the 928 x 1530 resolution used.]
 
 ##### CloudCast Github
+    This was linked to from Partio et al. (2024), which is a similar, but not identical to  Nielsen et al. (2021).
 
     "The geographical domain is that of MEPS (MEPS25D MEPS2500D):
         northern europe in lambert conformal conic projection, 2.5 km grid."
+    [Mike's Take: ]
 
-##### Partio et al. (2024)
+##### Partio et al. (2024) "CloudCast -- Total Cloud Cover Nowcasting with Machine Learning."
 
     "MetCoOp Ensemble Prediction System (MEPS)."
     "MEPS forecast is produced ... with a horizontal resolution of 2.5km."
@@ -120,40 +133,40 @@ Here I plotted the data from a .nat file. Note where these images are white, but
 
 ![MEPS domain](./images/meps_domain.png "MEPS")
 
-Partio et al. (2024) don't refer to the number of grids this MEPS domain contains, but they do point to a github repo that includes the following:
+    [Mike's Take: Partio et al. (2024) don't refer to the number of grids this MEPS domain contains, but they do
+     point to the CloudCast github that includes the following:]
 
     From cloudcast repo latlonraster() in cloudcast/base/plotutils.py
         img_size = (768, 768)
         x = np.linspace(-1065644.490, 1306855.478, 768)
         y = np.linspace(9683729.573, 7011229.349, 768)
 
-Of course, this does not coorespond the 768x768 domain refered to in the CloudCast Tutorial as the listed corner coordinates are all different! For example, the lower latitude is 42N not 50N, and the upper latitude is 60N not 75N.
-Also, the projections differ lambert conformal projection "lcc" vs. a stereographic projection "stere".
+    [Mike's Take: It is unclear if this is the "data was reprojected to lambert conformal conic projection" referred
+    to above or for the 728×728 results/classifications like with Nielsen et al. (2021). Or the confusing
+    728 × 728 results resolution the CloudCast Tutorial talks about, but the code says 768 × 768 like above. ]
 
-    CCAST_HEIGHT = 768
-    CCAST_WIDTH = 768
-    lower_left_xy = [-855100.436345, -4942000.0] or  (-4.802566482888071,  42.068097533886025)
-    upper_right_xy = [1448899.563655, -2638000.0] or (33.73865749382469,  60.15059617915855)
+****
 
+Following the CloudCast Tutorial: CloudCast Stereographic (768, 768) based on reprojection and interpolation .
 
-CloudCast Stereographic (768, 768) based on reprojection and interpolation.
+Here is the domain.
 
 ![CloudCast Sterographic](./images/ccast_Sterographic.png "CloudCast")
 
-![CloudCast Lambert Conformal](./images/ccast_LambertConformal.png "CloudCast")
+<!-- ![CloudCast Lambert Conformal](./images/ccast_LambertConformal.png "CloudCast") -->
+
+Here we show the associated data.
 
 ![CloudCast Sterographic](./images/ccast_data_Sterographic.png "CloudCast")
 
 ![CloudCast Sterographic HRV](./images/hrv_ccast_data_Sterographic.png "CloudCast")
 
+<!-- Here the data projected to Sterographic are reprojected to Lambert Conformal.
+
 ![CloudCast Lambert Conformal](./images/ccast_data_LambertConformal.png "CloudCast")
 
 ![CloudCast Lambert Conformal HRV](./images/hrv_ccast_data_LambertConformal.png "CloudCast")
-
-
-
-
-
+ -->
 ----
 
 ### Mike's Take
