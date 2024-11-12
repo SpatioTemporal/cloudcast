@@ -87,7 +87,7 @@ if as_lcc:
 
 ##
 # Display region (not data values)
-as_region = [False, True][1]
+as_region = [False, True][0]
 
 ##
 # Obvious
@@ -107,10 +107,6 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 use_dataset = ds_names[0]
 
 ##
-# Just IR_039
-#use_dataset = ds_names[2]
-
-##
 # Just IR_108
 # use_dataset = ds_names[3]
 
@@ -119,7 +115,7 @@ use_dataset = ds_names[0]
 FILE_PATH = "/Users/mbauer/tmp/CloudCast/msg/"
 BASENAME = ["MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA",
             "MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA",
-            "MSG3-SEVI-MSG15-0100-NA-20170104005740.099000000Z-NA"][2]
+            "MSG3-SEVI-MSG15-0100-NA-20170104005740.099000000Z-NA"][1]
 SUB_PATH = f"{FILE_PATH}{BASENAME}/"
 FNAME = f"{SUB_PATH}{BASENAME}.nat"
 TNAME = f"{SUB_PATH}{BASENAME}_{use_dataset}_{use_tag}.tif"
@@ -153,7 +149,7 @@ geo_stuff = setup_msg(use_dataset, as_ccast, as_euro, as_merc, as_lcc)
 #  "ccast_merc_crs", "msg_area_def", "msg_crs", "msg_merc_area_def", "msg_merc_crs")
 # for ii, ival in enumerate(tmp):
 #     print(f"\n{labels[ii]}: {ival}")
-os._exit(1)
+# os._exit(1)
 
 if make_tif:
     ##
@@ -235,8 +231,8 @@ if make_fig:
         # ax = plt.axes(projection=ccrs.Miller())
         # ax = plt.axes(projection=ccrs.Orthographic(central_longitude=0.0, central_latitude=0.0))
         # ax = plt.axes(projection=ccrs.Mercator(central_longitude=0.0, min_latitude=-80.0, max_latitude=80.0))
-        ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=0.0))
-        # ax = plt.axes(projection=ccrs.Geostationary(central_longitude=0.0)); as_geos = True
+        #ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=0.0))
+        ax = plt.axes(projection=ccrs.Geostationary(central_longitude=0.0)); as_geos = True
 
         # proj = ccrs.PlateCarree(central_longitude=0.0, globe=ccrs.Globe(datum='WGS84', ellipse='WGS84'))
         # ax = plt.axes(projection=proj)
@@ -311,7 +307,7 @@ if make_fig:
         the_alpha = 1.0
         if use_dataset == "HRV":
             # bounds = np.linspace(0.0, 15.0, num=16, endpoint=True)
-            bounds = np.linspace(0.0, 25.0, num=16, endpoint=True)
+            bounds = np.linspace(0.0, 25.0, num=11, endpoint=True)
             the_min = 0.0
             the_max = 25.0
         else:

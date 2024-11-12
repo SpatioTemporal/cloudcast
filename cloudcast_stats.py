@@ -6,6 +6,10 @@ cloudcast_stats
 ~~~~~~~~~~~~~~~
 
 $ python cloudcast_stats.py
+
+
+curl --output  full_raw_cloud.zip https://vision.eng.au.dk/data/CloudDataset/full_raw_cloud.zip
+
 """
 # Standard Imports
 import os
@@ -37,7 +41,8 @@ __docformat__ = "Numpydoc"
 
 ##
 # Define path to folder
-FILE_PATH = ["/Volumes/val/data/CloudCast/full_cropped_cloud/", "/Volumes/val/data/CloudCast/small_cloud/"][0]
+BASE_PATH = ["/Users/mbauer/tmp/", "/Volumes/saved/"][1]
+FILE_PATH = [f"{BASE_PATH}data/CloudCast/full_cropped_cloud/", f"{BASE_PATH}data/CloudCast/small_cloud/"][0]
 
 CCAST_YYYY = (2017, 2018)
 CCAST_MM = tuple(range(1, 13))
@@ -89,9 +94,8 @@ area_def = AreaDefinition('areaD', 'Europe', 'areaD',
                            upper_right_xy[0], upper_right_xy[1]))
 CCAST_CRS = area_def.to_cartopy_crs()
 
-SAVE_DIR = "/Volumes/val/hidden/cloudcast/"
+SAVE_DIR = f"{BASE_PATH}hidden/cloudcast/"
 SAVE_FILE = "cloudcast_stats.pkl"
-
 
 ###############################################################################
 # PUBLIC read_ccast()
@@ -194,8 +198,23 @@ def read_ccast(fname: str, get_coords: bool):
     if get_coords:
         ##
         # Pull spatial stereographic projection coordinates
-        x_coords = read_data.coords['lon'].values
-        y_coords = read_data.coords['lat'].values
+        #   Note lon and lat seem flipped and y_coords needs to be reversed.
+        #       y_coords (768): [-4940500.0 ... -2639500.0]
+        #       x_coords (768): [-853600.4  ...  1447399.6]
+        # It seems the y-axis needs to be reversed to match this corners
+        #   lower_left_xy = [-855100.436345, -4942000.0]
+        #   upper_right_xy = [1448899.563655, -2638000.0]
+        # Giveing
+        y_coords = read_data.coords['lon'].values
+        y_coords = y_coords[::-1]
+        x_coords = read_data.coords['lat'].values
+        # print(f"y_coords ({len(y_coords)}): [{y_coords[0]:8.1f} ... {y_coords[-1]:8.1f}]")
+        # print(f"x_coords ({len(x_coords)}): [{x_coords[0]:8.1f} ... {x_coords[-1]:8.1f}]")
+
+    # ##
+    # # To match flip and reverse of x_coords and y_coords
+    # ccast_dat = np.swapaxes(ccast_dat, 0, 1)
+    # ccast_dat = ccast_dat[:, ::-1, :]
 
     ##
     # Ensure memory released
@@ -220,6 +239,8 @@ def main():
 
     sfile = f"{SAVE_DIR}{SAVE_FILE}"
 
+
+
     if recall_stats:
         with open(sfile, 'rb') as f:
             tmp = pickle.load(f)
@@ -240,7 +261,8 @@ def main():
             #     continue
 
             if just_one:
-                with open('tmp.pkl', 'rb') as f:
+                # Need to save see TMP below
+                with open(f"{SAVE_DIR}tmp.pkl", 'rb') as f:
                     tmp = pickle.load(f)
                 ccast_dat, x_coords, y_coords, tstamps = tmp
             else:
@@ -249,21 +271,33 @@ def main():
                 ccast_dat, x_coords, y_coords, tstamps = read_ccast(get_file, 1 if ridx == 0 else 0)
                 ## print(f"{get_file.split('/')[-1]} {len(tstamps)}")
 
-                # # TMP save/recall for debugging
-                # # with open('tmp.pkl', 'wb') as f:
-                # #     tmp = (ccast_dat, x_coords, y_coords, tstamps)
-                # #     pickle.dump(tmp, f)
+                # # TMP save/recall for debugging w/ just_one
+                # with open(f"{SAVE_DIR}tmp.pkl", 'wb') as f:
+                #     tmp = (ccast_dat, x_coords, y_coords, tstamps)
+                #     pickle.dump(tmp, f)
+                # os._exit(1)
 
             if ridx == 0:
-                ccast_x = x_coords
-                ccast_y = y_coords
                 ##
                 # Convert from projection (Cartesian Coordinates) to geographic (Spherical Coordinates)
-                transformed = GEOD_CRS.transform_points(CCAST_CRS, ccast_x, ccast_y)
+
+                #   ccast_lons (768): [-12.921 ... 21.329] W to E
+                #   ccast_lats (768): [ 62.403 ... 40.928] N to S
+                transformed = GEOD_CRS.transform_points(CCAST_CRS, x_coords, y_coords)
                 ccast_lons = transformed[..., 0].tolist()
                 ccast_lats = transformed[..., 1].tolist()
                 ccast_nlons = len(ccast_lons)
                 ccast_nlats = len(ccast_lats)
+                if verbose:
+                    print(f"ccast_lons ({ccast_nlons}): [{ccast_lons[0]} ... {ccast_lons[-1]}]")
+                    print(f"ccast_lats ({ccast_nlats}): [{ccast_lats[0]} ... {ccast_lats[-1]}]")
+
+                # print("Mike")
+                # print(ccast_lons)
+                # print("Kim")
+                # print(ccast_lats)
+                # os._exit(1)
+
 
                 ##
                 # Surface area of the data-grid (Latitude-Longitude Quadrangle) [km^2]
@@ -385,7 +419,8 @@ def main():
     ##
     # Set to False if you do not want background image
     use_nasa_background = [False, True][0]
-    freq_map_cmap = "plasma"
+    # freq_map_cmap = "plasma"
+    freq_map_cmap = "brg"
 
     """
     Pixel Time Occurrence/Frequency by CType
@@ -443,7 +478,6 @@ def main():
         ##
         # Fractional time coverage
         if just_one:
-            os.exit(1)
             ctype_z_map_occurence[cidx, :] = np.divide(ctype_map_cnts[ctype, :], 2976) * 100.0
         else:
             tmp = np.zeros((CCAST_1D_LEN,), dtype=int)
@@ -464,12 +498,97 @@ def main():
             ax.background_img(name='BM', resolution='low')
         else:
             ax.add_feature(cfeature.COASTLINE, alpha=0.5)
-        a_image = plt.imshow(mapdat, cmap=freq_map_cmap, transform=CCAST_CRS, extent=CCAST_CRS.bounds, origin='upper')
+
+        # norm=None
+        a_image = plt.imshow(mapdat, cmap=freq_map_cmap, transform=CCAST_CRS, extent=CCAST_CRS.bounds, vmin=0, vmax=100, origin='upper')
         fig.colorbar(a_image, ax=ax, label=f"Time Frequency of Occurrence\n{ctype} [%]")
         fig.savefig(pname, facecolor='w', edgecolor='w', orientation='landscape', dpi=300)
         plt.clf()
         plt.close('all')
 
+    ##
+    # Make RGB Composite
+    print("\n\nRGB Composite")
+    def scale_min_max(in_ndarray):
+        return (in_ndarray - np.nanmin(in_ndarray)) / (np.nanmax(in_ndarray) - np.nanmin(in_ndarray))
+
+    # def rgb_int2tuple(rgbint):
+    #     return (rgbint // 256 // 256 % 256, rgbint // 256 % 256, rgbint % 256)
+
+
+    for cidx, ctype in enumerate(CCAST_CTYPES_Z.keys()):
+        if cidx == 0:
+            continue
+        elif cidx == 1:
+            # Low Cloud
+            #   red_band (768, 768) = array([[34.93339425, ..., 28.85820757], ... 19.94174674]])
+            red_band = np.copy(ctype_z_map_occurence[cidx, :])
+            red_band = np.reshape(red_band, (CCAST_HEIGHT, CCAST_WIDTH))
+        elif cidx == 2:
+            # Mid Cloud
+            green_band = np.copy(ctype_z_map_occurence[cidx, :])
+            green_band = np.reshape(green_band, (CCAST_HEIGHT, CCAST_WIDTH))
+        elif cidx == 3:
+            # High Cloud
+            blue_band = np.copy(ctype_z_map_occurence[cidx, :])
+            blue_band = np.reshape(blue_band, (CCAST_HEIGHT, CCAST_WIDTH))
+
+    ##
+    # Define color map
+    # color_map = {1: np.array([255, 0, 0]), # red
+    #              2: np.array([0, 255, 0]), # green
+    #              3: np.array([0, 0, 255])} # blue
+
+    #   red_normalized from 0 to 1
+    red_normalized = scale_min_max(red_band)
+    ## red_normalized = 0.0 * red_normalized
+    #   red_normalized from 0 to 255
+    ## red_normalized = np.round(red_normalized * 255.0, decimals=0).astype(int)
+
+    green_normalized = scale_min_max(green_band)
+    ## green_normalized = 0.0 * green_normalized
+    ## green_normalized = np.round(green_normalized * 255.0, decimals=0).astype(int)
+
+    blue_normalized = scale_min_max(blue_band)
+    ## blue_normalized = 0.0 * blue_normalized
+    ## blue_normalized = np.round(blue_normalized * 255.0, decimals=0).astype(int)
+
+    #   rgb_normalized = [[[186 131 147] ... [187 131 147]]]
+    # rgb_normalized = np.dstack((red_normalized, green_normalized, blue_normalized)).astype(int)
+    rgb_normalized = np.dstack((red_normalized, green_normalized, blue_normalized))
+
+
+
+    r"""
+    RGB Composite
+        Red  : Min     0 Mean   126 Max   255
+        Green: Min     0 Mean    71 Max   255
+        Blue : Min     0 Mean    98 Max   255
+        RGB  : Min     0 Mean    98 Max   255
+    """
+    print(f"\tRed  : Min {np.amin(red_normalized):6.3f} Mean {np.mean(red_normalized):6.3f} Max {np.amax(red_normalized):6.3f}")
+    print(f"\tGreen: Min {np.amin(green_normalized):6.3f} Mean {np.mean(green_normalized):6.3f} Max {np.amax(green_normalized):6.3f}")
+    print(f"\tBlue : Min {np.amin(blue_normalized):6.3f} Mean {np.mean(blue_normalized):6.3f} Max {np.amax(blue_normalized):6.3f}")
+    print(f"\tRGB  : Min {np.amin(rgb_normalized):6.3f} Mean {np.mean(rgb_normalized):6.3f} Max {np.amax(rgb_normalized):6.3f}")
+
+    pname = f"{SAVE_DIR}ccast_freq_map_z_RGB.png"
+    fig = plt.figure(figsize=(10, 8))
+    ax = plt.axes(projection=CCAST_CRS)
+    ax.add_feature(cfeature.COASTLINE, alpha=0.5)
+
+    # from matplotlib.colors import LinearSegmentedColormap
+    # cast_rgb = LinearSegmentedColormap('CAST_RGB', cdict1)
+
+    # norm=None
+    # a_image = plt.imshow(rgb_normalized, cmap=freq_map_cmap, transform=CCAST_CRS, extent=CCAST_CRS.bounds, vmin=0, vmax=1, origin='upper')
+    a_image = plt.imshow(rgb_normalized, transform=CCAST_CRS, extent=CCAST_CRS.bounds, origin='upper')
+    # a_image = plt.imshow(rgb_normalized, cmap=freq_map_cmap, transform=CCAST_CRS, extent=CCAST_CRS.bounds, origin='upper')
+
+    # fig.colorbar(a_image, ax=ax, label=f"Time Frequency of Occurrence\n{ctype} [%]")
+
+    fig.savefig(pname, facecolor='w', edgecolor='w', orientation='landscape', dpi=300)
+    plt.clf()
+    plt.close('all')
 
 # ---Start of main code block.
 if __name__ == '__main__':

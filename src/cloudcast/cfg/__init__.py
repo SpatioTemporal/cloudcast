@@ -6,6 +6,7 @@ src/cfg/__init__
 ~~~~~~~~~~~~~~~~~~~~~~~
 """
 # Local Imports
+from .setup_msg import setup_msg
 
 # Define Global Constants and State Variables
 # -------------------------------------------

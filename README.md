@@ -27,10 +27,10 @@ See setup.py to install the `cloudcast` package (or after adding any new modules
 
 ### Meteosat Second Generation (MSG) level 1.5 (sourced from Müller et al. 2019, Schmetz et al. 2002)
 
-#### Full Disk
-MSG data is provided as Full Disk (geostationary), meaning that roughly the complete North-South extent of the globe from the Atlantic to the Indian Ocean is present in each file. See FIG. 3 in Schmetz et al. (2002) and Figure 6 in Müller et al. 2019.
+#### Full-Disk (IR Channels)
+MSG data is provided as full-disk (geostationary), meaning that roughly the complete North-South extent of the globe from the Atlantic to the Indian Ocean is present in each file. See FIG. 3 in Schmetz et al. (2002) and Figure 6 in Müller et al. 2019.
 
-![PlateCarree Projection](./images/full_frame_PlateCarree.png "PlateCarree")
+![Full-Disk (IR Channels, 3712 x 3712) Geostationary Projection](./images/full_frame_Geostationary.png "Geostationary")
 
 The image projection being applied nominally is the Normalized Geostationary Projection (GEOS) as per (see Coordination Group for Meteorological Satellites), centered on 0 deg longitude, as this introduces the least distortions in the Level 1.5 image.
 
@@ -41,41 +41,81 @@ In this projection, the projected coordinates are scanning angles measured from 
 MSG data nominal position id at 0 deg lon and approximately +/-90 deg latitude
 
 * Spatial sampling distance of 3 km for the IR 11 channels.
-* The full disk image has 3712 x 3712 pixels (N-S by E-W).
+* The full-disk image has 3712 x 3712 pixels (N-S by E-W).
 * A geostationary projection center (0 deg longitude, 0 deg latitude) coincides with the middle of the pixel that has the line and column number (1856, 1856). Where the pixel numbering starts in the South-Eastern corner of the image with line and column number (1,1).
 
-Reading from a .nat file you'll find a list of longitudes and latitudes ranging in value.
+Reading from a .nat file you'll find a list of longitudes and latitudes ranging in value (raw file input, IR_087 channel).
 
-    lons (3712, 3712) (10280792): [-81.12566375732422, ... 81.12566375732422]
-    lats (3712, 3712) (10280792): [-81.0744857788086, ... 81.0744857788086]
+    lons      (3712, 3712) (10280792): [-81.126, ... 81.126]
+    lats      (3712, 3712) (10280792): [-81.075, ... 81.075]
+    data_vals (3712, 3712) (10213685): [2.155,   ... 68.442]
 
-However, you will find that the Geostationary Projection can't show all of this. This is because there are lots of missing data values with valid lon/lat entries. If you limit the lon/lat to where valid data are found you'll get something more like 50104766 rather than 50524714 entries (1D)
+However, you will find that the Geostationary Projection can't show all of this. This is because there are lots of missing data values with valid lon/lat entries. If you limit the lon/lat to where valid data ($\ge 0$) are found you'll get something more like 10213685 rather than 10280792 entries (1D, 99.4% of all grids)
 
-    lons (10213685): [-75.26545715332031 ... 75.56462097167969]
-    lats (10213685): [-78.95874786376953 ... 78.29975891113281]
+    lons (10213685): [-75.266 ... 75.565]
+    lats (10213685): [-78.959 ... 78.230]
 
-**An important** aspect to keep in mind here is this full disk view does not use interpolation, only re-projection of point to lat/lon.
+Note that there is no difference if we exclude zero valued grids ($\gt 0$). In this case any way. As we will see below this is not the case with the visiable channel.
 
-![Geostationary Projection](./images/full_frame_Geostationary.png "Geostationary")
+**An important** aspect to keep in mind here is this full-disk view does not use interpolation, only re-projection of point to lat/lon. These data points can be easily reprojected to other formats, here only valid data grids are shaded.
 
-#### Partial Disk
+![Full-Disk (IR Channels, 3712 x 3712) PlateCarree Projection](./images/full_frame_PlateCarree.png "PlateCarree")
 
-A high-resolution visible (HRV) channel has a 1-km spatial sampling distance. HRV covers only half the E–W direction of the Full Disk with 11136 x 5568 pixels (N-S by E-W). For the HRV image, the nominal geostationary position is the middle of the HRV-pixel with the line and column number (5566, 5566) relative to the Full Disk datagrid.
+#### Partial-Disk (VIS Channel)
+
+A high-resolution visible (HRV) channel has a 1-km spatial sampling distance. HRV covers only half the E–W direction of the full-disk with 11136 x 5568 pixels (N-S by E-W). For the HRV image, the nominal geostationary position is the middle of the HRV-pixel with the line and column number (5566, 5566) relative to the full-disk datagrid.
 
 The registration of HRV and non-HRV pixels is done in such a way that the HRV pixel lies at the center of the pixel of the other channels.
 
-![PlateCarree Projection](./images/hrv_frame_PlateCarree.png "PlateCarree")
-![Geostationary Projection](./images/hrv_frame_Geostationary.png "Geostationary")
+![Partial-Disk (VIS Channel, 11136 x 5568) Geostationary Projection](./images/hrv_frame_Geostationary.png "Geostationary")
 
-Here I plotted the data from a .nat file. Note where these images are white, but look from the above images to be within the valid data domain, there is either no cloud or no data reported.
+As before, reading from a .nat file you'll find a list of longitudes and latitudes ranging in value (raw file input).
 
-**An important** aspect to keep in mind here is like the full disk view, partial disk view the does not use interpolation, only re-projection of point to lat/lon.
+    lons      (11136, 5568) (50498347): [-65.736, ... 81.220]
+    lats      (11136, 5568) (50498347): [-81.136, ... 81.136]
+    data_vals (11136, 5568) (50129989): [0.0,     ... 27.711]
 
-![PlateCarree Projection](./images/full_frame_data_PlateCarree.png "PlateCarree")
-![Geostationary Projection](./images/full_frame_data_Geostationary.png "Geostationary")
+Likewise, you will find that the Geostationary Projection can't show all of this. This is because there are lots of missing data values with valid lon/lat entries. If you limit the lon/lat to where valid data ($\ge 0$) are found you'll get something more like 50129989 rather than 50498347 entries (1D, 99.2% of all grids)
 
-![PlateCarree Projection](./images/hrv_frame_data_PlateCarree.png "PlateCarree")
-![Geostationary Projection](./images/hrv_frame_data_Geostationary.png "Geostationary")
+    lons (50129989): [-58.130  ... 75.565]
+    lats (50129989): [-78.960  ... 78.301]
+
+If we exclude zero valued grids ($\gt 0$), we find far fewer 'valid' values (31.2% of all grids). In this case anyway.
+
+    lons (15736845): [-58.049  ... 75.565]
+    lats (15736845): [-78.960  ... 78.294]
+
+**An important** aspect to keep in mind here is like the full-disk view, partial-disk view the does not use interpolation, only re-projection of point to lat/lon.
+
+![Partial-Disk (VIS Channel, 11136 x 5568) PlateCarree Projection](./images/hrv_frame_PlateCarree.png "PlateCarree")
+
+----
+
+Next, I plotted the data from a .nat file. Note where these images are white, but look from the above images to be within the valid data domain, there is either no cloud or no data reported.
+
+![Full-Disk (IR 10.8 $\mu$m Channel, 3712 x 3712) Geostationary Projection](./images/full_frame_data_Geostationary.png "Geostationary")
+
+<!-- ![Full-Disk (IR 10.8 $\mu$m Channel, 3712 x 3712) PlateCarree Projection](./images/full_frame_data_PlateCarree.png "PlateCarree") -->
+
+We can also see very clearly the asysmetry of non-zero data between the IR and VIS channel.
+
+![Partial-Disk (VIS 0.7 $\mu$m Channel, 11136 x 5568) Geostationary Projection](./images/hrv_frame_data_Geostationary_missmuch.png "Geostationary")
+
+<!-- ![Partial-Disk (VIS 0.7 $\mu$m Channel, 11136 x 5568) PlateCarree Projection](./images/hrv_frame_data_PlateCarree_missmuch.png "PlateCarree") -->
+
+Note below is the VIS channel for another time to show the variablity of this channel in terms of coverage.
+
+![Partial-Disk (VIS 0.7 $\mu$m Channel, 11136 x 5568) Geostationary Projection](./images/hrv_frame_data_Geostationary.png "Geostationary")
+
+<!-- ![Partial-Disk (VIS 0.7 $\mu$m Channel, 11136 x 5568) PlateCarree Projection](./images/hrv_frame_data_PlateCarree.png "PlateCarree") -->
+
+
+
+Reading  0 2017M01.nc
+    ccast_lons (768): [-12.921 ... 21.329] W to E
+    ccast_lats (768): [ 62.403 ... 40.928] N to S
+
+filename_raw =f'../input/full_raw_cloud/2017-01/CT/S_NWC_CT_MSG3_MSG-N-VISIR_20170101T010000Z.nc'cloud_cast_label = gdal.Open(filename_raw)print(cloud_cast_label.GetMetadata())data = cloud_cast_label.ReadAsArray()
 
 ----
 
@@ -87,10 +127,7 @@ Here I plotted the data from a .nat file. Note where these images are white, but
     satellite constellation in geostationary orbit centered at zero degrees longitude and arrive in 15-min intervals.
     The resolution is 3712 × 3712 pixels for the full-disk of the Earth, which implies that every pixel corresponds
     to a space of dimensions 3 × 3 km."
-    [Mike's Take: This sounds like they are using the full- and partial-disk data directly.]
-
-    "we sample one visible channel, two infrared channels, and one water vapor channel for each observation
-    to enable multilayer cloud detection."
+    [Mike's Take: This sounds like they are using the full- and partial-disk data directly. That is, no interpolation or subsetting.]
 
     "As a final postprocessing step, we interpolate missing observations that can arise due to numerous reasons
     such as scheduled outages or sun outages. More specifically, we interpolate the missing observations from
@@ -98,7 +135,7 @@ Here I plotted the data from a .nat file. Note where these images are white, but
 
     "In addition to the raw dataset, we also publish a standardized version for future studies, where we center and
     project the final annotated dataset to cover Central Europe, which implies a final resolution of 728 × 728 pixels."
-    [Mike's Take: So the results/classifications are on 728x728.]
+    [Mike's Take: So the results/classifications are on 728 x 728.]
 
 ##### CloudCast Tutorial
     This is linked to form Nielsen et al. (2021)
@@ -114,14 +151,13 @@ Here I plotted the data from a .nat file. Note where these images are white, but
     [Mike's Take: like the results/classifications from Nielsen et al. (2021)]
 
     [Mike's Take: What odd is the CloudCast Tutorial itself doesn't use 728 × 728 results resolution it talks about,
-        but 768 × 768. No where in the CloudCast Tutorial code is the 928 x 1530 resolution used.]
+        but 768 × 768. Nowhere in the CloudCast Tutorial code is the 928 x 1530 resolution used.]
 
 ##### CloudCast Github
     This was linked to from Partio et al. (2024), which is a similar, but not identical to  Nielsen et al. (2021).
 
     "The geographical domain is that of MEPS (MEPS25D MEPS2500D):
         northern europe in lambert conformal conic projection, 2.5 km grid."
-    [Mike's Take: ]
 
 ##### Partio et al. (2024) "CloudCast -- Total Cloud Cover Nowcasting with Machine Learning."
 
@@ -142,82 +178,8 @@ Here I plotted the data from a .nat file. Note where these images are white, but
         y = np.linspace(9683729.573, 7011229.349, 768)
 
     [Mike's Take: It is unclear if this is the "data was reprojected to lambert conformal conic projection" referred
-    to above or for the 728×728 results/classifications like with Nielsen et al. (2021). Or the confusing
-    728 × 728 results resolution the CloudCast Tutorial talks about, but the code says 768 × 768 like above. ]
-
-****
-
-Following the CloudCast Tutorial: CloudCast Stereographic (768, 768) based on reprojection and interpolation .
-
-Here is the domain.
-
-![CloudCast Sterographic](./images/ccast_Sterographic.png "CloudCast")
-
-<!-- ![CloudCast Lambert Conformal](./images/ccast_LambertConformal.png "CloudCast") -->
-
-Here we show the associated data.
-
-![CloudCast Sterographic](./images/ccast_data_Sterographic.png "CloudCast")
-
-![CloudCast Sterographic HRV](./images/hrv_ccast_data_Sterographic.png "CloudCast")
-
-<!-- Here the data projected to Sterographic are reprojected to Lambert Conformal.
-
-![CloudCast Lambert Conformal](./images/ccast_data_LambertConformal.png "CloudCast")
-
-![CloudCast Lambert Conformal HRV](./images/hrv_ccast_data_LambertConformal.png "CloudCast")
- -->
-----
-
-### Mike's Take
-
-The quote "spatial resolution of 928 x 1530 pixels .... where each pixel represents an area of 3×3 km." suggests a simple subset of the non-HRV MSG data.
-
-I assume the longitude subset of 928 rows starts from the northern most row.
-
-    (928*3)/111 = 25.081 deg lat giving 81.1257 - 25.081 = 56.0447.
-
-So 81N to 56N, or using valid data lats
-
-    78.2998 - 25.081 = 53.2188
-
-or 78N to 53N, which is close to 75N to 50N used by Partio et al. (2024).
-
-20W and 45E
-
-
-Note: the "full_cropped" CloudCast results has the 768x768 resolution. The coordinates are given in projected coordinates not lon/lat.
-```
-File "2017M01.nc"
-File type: Hierarchical Data Format, version 5
-
-netcdf /Users/mbauer/tmp/CloudCast/full_cropped_cloud/2017M01.nc {
-  dimensions:
-    lat = 768;
-    lon = 768;
-    time = 2976;
-  variables:
-    double lat(lat=768);
-      :_FillValue = NaN; // double
-
-    double lon(lon=768);
-      :_FillValue = NaN; // double
-
-    long time(time=2976);
-      :calendar = "proleptic_gregorian";
-      :units = "minutes since 2017-01-01 00:09:17";
-
-    ubyte __xarray_dataarray_variable__(lat=768, lon=768, time=2976);
-
-  // global attributes:
-}
-```
-
-
-
-### CloudCast
-The dataset has a spatial resolution of 928 x 1530 pixels recorded with 15-min intervals for the period 2017-2018, where each pixel represents an area of 3×3 km.
-
+    to above or for the 728 × 728 results/classifications like with Nielsen et al. (2021). Or the confusing
+    728 × 728 results resolution the CloudCast Tutorial talks about, but the code says 768 × 768 like above.]
 
 ### References
 

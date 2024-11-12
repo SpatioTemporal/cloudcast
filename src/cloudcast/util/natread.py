@@ -254,36 +254,38 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool) -> None:
     for ii, ival in enumerate(tmp_vals):
         if np.isnan(ival):
             continue
+        if ival == 0.0:
+            continue
         if np.abs(tmp_lons[ii]) <= 180.0 and np.abs(tmp_lats[ii]) <= 90.0:
             good_lons.append(tmp_lons[ii])
             good_lats.append(tmp_lats[ii])
-            if ll_corner[0] is not None:
-                if tmp_lats[ii] <= ll_corner[0]:
-                    # New Lower Latitude
-                    if tmp_lons[ii] < ll_corner[1]:
-                        # New ll corner
-                        ll_corner[0] = tmp_lats[ii]
-                        ll_corner[1] = tmp_lons[ii]
-            else:
-                # New ll corner
-                ll_corner[0] = tmp_lats[ii]
-                ll_corner[1] = tmp_lons[ii]
-            if ur_corner[0] is not None:
-                if tmp_lats[ii] >= ur_corner[0]:
-                    # New higher Latitude
-                    if tmp_lons[ii] > ur_corner[1]:
-                        # New ur corner
-                        ur_corner[0] = tmp_lats[ii]
-                        ur_corner[1] = tmp_lons[ii]
-            else:
-                # New ur corner
-                ur_corner[0] = tmp_lats[ii]
-                ur_corner[1] = tmp_lons[ii]
+            # if ll_corner[0] is not None:
+            #     if tmp_lats[ii] <= ll_corner[0]:
+            #         # New Lower Latitude
+            #         if tmp_lons[ii] < ll_corner[1]:
+            #             # New ll corner
+            #             ll_corner[0] = tmp_lats[ii]
+            #             ll_corner[1] = tmp_lons[ii]
+            # else:
+            #     # New ll corner
+            #     ll_corner[0] = tmp_lats[ii]
+            #     ll_corner[1] = tmp_lons[ii]
+            # if ur_corner[0] is not None:
+            #     if tmp_lats[ii] >= ur_corner[0]:
+            #         # New higher Latitude
+            #         if tmp_lons[ii] > ur_corner[1]:
+            #             # New ur corner
+            #             ur_corner[0] = tmp_lats[ii]
+            #             ur_corner[1] = tmp_lons[ii]
+            # else:
+            #     # New ur corner
+            #     ur_corner[0] = tmp_lats[ii]
+            #     ur_corner[1] = tmp_lons[ii]
     if verbose:
         print(f"good_lons ({len(good_lons)}): [{np.amin(good_lons)} ... {np.amax(good_lons)}]")
         print(f"good_lats ({len(good_lats)}): [{np.amin(good_lats)} ... {np.amax(good_lats)}]")
-        print(f"ll_corner: {ll_corner}")
-        print(f"ur_corner: {ur_corner}")
+        # print(f"ll_corner: {ll_corner}")
+        # print(f"ur_corner: {ur_corner}")
 
     return
 

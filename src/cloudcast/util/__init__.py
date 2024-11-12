@@ -8,6 +8,7 @@ src/__init__.py
 # Local Imports
 from .nat2tif import nat2tif
 from .readnat import readnat
+from .natread import natread
 from .find_grid_area import find_grid_area
 
 # Define Global Constants and State Variables
