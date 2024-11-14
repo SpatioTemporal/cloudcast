@@ -109,14 +109,6 @@ Note below is the VIS channel for another time to show the variablity of this ch
 
 <!-- ![Partial-Disk (VIS 0.7 $\mu$m Channel, 11136 x 5568) PlateCarree Projection](./images/hrv_frame_data_PlateCarree.png "PlateCarree") -->
 
-
-
-Reading  0 2017M01.nc
-    ccast_lons (768): [-12.921 ... 21.329] W to E
-    ccast_lats (768): [ 62.403 ... 40.928] N to S
-
-filename_raw =f'../input/full_raw_cloud/2017-01/CT/S_NWC_CT_MSG3_MSG-N-VISIR_20170101T010000Z.nc'cloud_cast_label = gdal.Open(filename_raw)print(cloud_cast_label.GetMetadata())data = cloud_cast_label.ReadAsArray()
-
 ----
 
 #### What the docs say
@@ -180,6 +172,28 @@ filename_raw =f'../input/full_raw_cloud/2017-01/CT/S_NWC_CT_MSG3_MSG-N-VISIR_201
     [Mike's Take: It is unclear if this is the "data was reprojected to lambert conformal conic projection" referred
     to above or for the 728 × 728 results/classifications like with Nielsen et al. (2021). Or the confusing
     728 × 728 results resolution the CloudCast Tutorial talks about, but the code says 768 × 768 like above.]
+
+### CloudCast
+
+Following the CloudCast Tutorial, we see the "full_cropped_cloud" data takes on a Stereographic (768 x 768) based on reprojection and interpolation from the Geostationary source MSG data. Moreover, looking at a CloudCast datafile "full_cropped_cloud/2017M01.nc" we see that the array has the dimentions of `(lat: 768, lon: 768, time: 2976)`, suggesting fixed lon/lat grid, which is not what simply sampling the MSG data would give.
+
+Here is the resulting domain.
+
+![CloudCast 768 x 768 Sterographic](./images/ccast_Sterographic.png "CloudCast")
+
+Below is the summary "full_cropped_cloud" cloud-type occurence RGB.
+
+![CloudCast 768 x 768 Geostationary](./images/ccast_freq_map_z_RGB.png "CloudCast")
+
+<!-- ![CloudCast Lambert Conformal](./images/ccast_LambertConformal.png "CloudCast") -->
+\
+In comparison, the "full_raw_cloud" dataset lists lat and lon as 928 x 1530 2D arrays (as expected).
+
+![CloudCast Raw 928 x 1530 Geostationary](./images/ccast_raw_freq_map_z_RGB_region.png "CloudCast")
+
+Below is the summary "full_raw_cloud" cloud-type occurence RGB.
+
+![CloudCast 928 x 1530 Geostationary](./images/ccast_raw_freq_map_z_RGB.png "CloudCast")
 
 ### References
 

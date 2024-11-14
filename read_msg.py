@@ -341,7 +341,7 @@ if make_fig:
         cbar.solids.set(alpha=1)
 
     plt.show()
-    # To trim https://www.zackwebster.com/tools/image-trim#_
+    # To trim region
 
 print("Done")
 
