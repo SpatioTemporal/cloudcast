@@ -10,6 +10,7 @@ $ python read_msg.py
 """
 # Standard Imports
 import os
+import pickle
 
 # Third-Party Imports
 import numpy as np
@@ -36,11 +37,11 @@ __docformat__ = "Numpydoc"
 
 ##
 # Convert a nat file to geotif
-make_tif = [False, True][1]
+make_tif = [False, True][0]
 
 ##
 # Read the nat file only
-read_nat = [False, True][0]
+read_nat = [False, True][1]
 
 ##
 # Make a figure
@@ -51,11 +52,11 @@ make_fig = [False, True][1]
 
 ##
 # Return MSG full frame data (no reprojection, subsetting or interpolation)
-as_full = [False, True][1]
+as_full = [False, True][0]
 
 ##
 # Return the CloudCast european resolution and domain (reprojection, subsetting and interpolation)
-as_euro = [False, True][0]
+as_euro = [False, True][1]
 
 ##
 # Return the CloudCast resolution and domain (reprojection, subsetting and interpolation)
@@ -104,11 +105,11 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 
 ##
 # Just HRV
-use_dataset = ds_names[0]
+# use_dataset = ds_names[0]
 
 ##
 # Just IR_108
-# use_dataset = ds_names[3]
+use_dataset = ds_names[3]
 
 ##
 # Define path to folder
@@ -133,10 +134,29 @@ if as_region:
 #   https://satpy.readthedocs.io/en/stable/api/satpy.readers.seviri_l1b_native.html
 reader = "seviri_l1b_native"
 
+if as_euro:
+    ##
+    # Read raw_lons, raw_lats for CloudCast raw for lon/lat domain matching with MSG
+    #   raw_lons (928, 1530): [-69.2706298828125  ... 69.2706298828125]
+    #   raw_lats (928, 1530): [ 26.67105484008789 ... 81.09877014160156]
+    with open(f"/Volumes/saved/hidden/cloudcast/raw_coords.pkl", 'rb') as f:
+        tmp = pickle.load(f)
+        raw_lons, raw_lats = tmp
+        del tmp
+    if verbose:
+        tmp = raw_lons.flatten()
+        tmp = tmp[np.abs(tmp) <= 180.0]
+        print(f"\traw_lons {raw_lons.shape}: [{np.amin(tmp)} ... {np.amax(tmp)}]")
+        tmp = raw_lats.flatten()
+        tmp = tmp[np.abs(tmp) <= 90.0]
+        print(f"\traw_lats {raw_lats.shape}: [{np.amin(tmp)} ... {np.amax(tmp)}]")
+else:
+    raw_lons = np.zeros((1,1))
+    raw_lats = np.zeros((1,1))
 if read_nat:
     ##
     # Read the file
-    natread(fname=FNAME, fvar=use_dataset, reader=reader, to_euro=as_euro)
+    natread(fname=FNAME, fvar=use_dataset, reader=reader, to_euro=as_euro, euro_lons=raw_lons, euro_lats=raw_lats)
     os._exit(1)
 
 ##

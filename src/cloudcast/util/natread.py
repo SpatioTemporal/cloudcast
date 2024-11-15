@@ -14,6 +14,7 @@ from typing import Optional, Union, TypeAlias
 
 # Third-Party Imports
 import numpy as np
+import numpy.typing as npt
 from osgeo import gdal
 from osgeo import osr
 import pyresample as pr
@@ -40,7 +41,7 @@ __docformat__ = "Numpydoc"
 ###############################################################################
 # PUBLIC natread()
 # ----------------
-def natread(fname: str, fvar: str, reader: str, to_euro: bool) -> None:
+def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.ArrayLike, euro_lats: npt.ArrayLike) -> None:
 
     verbose = [False, True][1]
 
@@ -137,7 +138,7 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool) -> None:
     if verbose:
         tmp = lons.flatten()
         tmp = tmp[np.abs(tmp) <= 180.0]
-        print(f"\tlons {lons.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+        print(f"\n\tlons {lons.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
         tmp = lats.flatten()
         tmp = tmp[np.abs(tmp) <= 90.0]
         print(f"\tlats {lats.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
@@ -146,6 +147,253 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool) -> None:
         print(f"\tdata_vals {data_vals.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
         del tmp
     if to_euro:
+        #   euro_lons (928, 1530): [-69.2706298828125   ... 69.2706298828125]
+        #   euro_lats (928, 1530): [ 26.67105484008789  ... 81.09877014160156]
+        #
+        #   lons (3712, 3712)    : [-81.12566375732422, ... 81.12566375732422]
+        #   lats (3712, 3712)    : [-81.0744857788086,  ... 81.0744857788086]
+        #
+        #   fvar == HRV
+        #   lons (11136, 5568)   : [-65.47019958496094, ... 81.21913146972656]
+        #   lats (11136, 5568)   : [-81.13614654541016, ... 81.13614654541016]
+        """
+            euro_lats (928, 1530) vs lats (3712, 3712)
+
+        """
+
+
+        if fvar == 'HRV':
+            pass
+        else:
+            ##
+            # Look for i/j (col/row) alignment
+            r"""
+            euro_lats organized so that they start in North and move South, while euro_lons start in the West and move East
+
+                euro_lats 0000: NAN
+                ...
+                euro_lats 0050: NAN
+                euro_lats 0051: i_start = 0741   +81.0988 ... i_end = 0789   +81.0988
+                ...
+                euro_lats 0927: i_start = 0000   +27.1626 ... i_end = 1529   +27.1612
+
+                euro_lons 0000: NAN
+                ...
+                euro_lons 0050: NAN
+                euro_lons 0051: i_start = 0741    -4.8004 ... i_end = 0789    +4.8004
+                ...
+                euro_lons 0927: i_start = 0000   -24.7438 ... i_end = 1529   +24.7077
+
+            lats organized so that they start in South and move North, while
+
+                lats 0000: NAN
+                ...
+                lats 0051: i_start = 1808   -81.0745 ... i_end = 1903   -81.0745
+                ...
+                lats 1855: i_start = 0045    -0.0157 ... i_end = 3666    -0.0157
+                ....
+                lats 1856: i_start = 0045    +0.0157 ... i_end = 3666    +0.0157    Start N Hemi
+                ...
+                lats 2652: i_start = 0229   +26.0090 ... i_end = 3482   +26.0090    Approaching Southern edge of euro_lats
+                ...
+                lats 3660: i_start = 1808   +81.0745 ... i_end = 1903   +81.0745
+                lats 3661: NAN
+                ...
+                lats 3711: NAN
+
+                lons 0000: NAN
+                ...
+                lons 0050: NAN
+                lons 0051: i_start = 1808    +9.5090 ... i_end = 1903    -9.5090
+                ...
+                lons 3660: i_start = 1808    +9.5090 ... i_end = 1903    -9.5090
+                lons 3661: NAN
+                ...
+                lons 3711: NAN
+
+            Need to reverse order of both euro_lats and euro_lons
+
+                euro_lats 0000: i_start = 0000   +27.1612 ... i_end = 1529   +27.1626
+                ...
+                euro_lats 0876: i_start = 0740   +81.0988 ... i_end = 0788   +81.0988
+                euro_lats 0877: NAN
+                ...
+                euro_lats 0927: NAN
+
+
+            """
+
+            euro_lats = euro_lats[::-1, ::-1]
+            euro_lons = euro_lons[::-1, ::-1]
+            for jidx in range(euro_lons.shape[0]):
+                msg = f"euro_lons {jidx:04d}:"
+                tmp = euro_lons[jidx, :]
+
+                # for euro_lats/euro_lons
+                good_idx = np.nonzero(~np.isnan(tmp))[0]
+
+                # for lats/lons
+                # good_idx = np.nonzero(~np.isinf(tmp))[0]
+                if len(good_idx) == 0:
+                    print(f"{msg} NAN")
+                    continue
+                else:
+                    print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
+            os._exit(1)
+            print("\n")
+
+            # for jidx in range(euro_lats.shape[0]):
+            #     msg = f"\teuro_lats {jidx:04d}:"
+            #     tmp = euro_lats[jidx, :]
+            #     good_idx = np.nonzero(~np.isnan(tmp))[0]
+            #     if len(good_idx) == 0:
+            #         print(f"{msg} NAN")
+            #         continue
+            #     else:
+            #         print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
+
+            ##
+            # The minimum height is 928 rows of the starting 3712 rows
+            #   so skip_to_bot = 2652 leaves enough (1060) for a fit.
+            skip_to_bot = 2652
+
+            #   check_hieght = 1060
+            check_hieght = lats.shape[0] - 2652
+            # print(f"{check_hieght = }")
+
+            #   col_span = 1530
+            col_span = euro_lats.shape[1]
+            # print(f"{col_span = }")
+
+            """
+            raw_top_row 0927
+            top_row     3712
+            raw_bot_row 0000
+            bot_row     2784
+
+            test_lats (928, 3712)
+
+            Min Lat Col 1090 w/ diff 40847800
+                1090+1530 = 2620
+                3712-2620 = 1092
+
+            Starting with
+                 raw_lats (928, 1530) vs ccast_lats (3712, 3712)
+                 raw_lons (928, 1530) vs ccast_lons (3712, 3712)
+
+            We want a subset of ccast_lats/ccast_lons that has the dimensions (928, 1530) and has the minimum absolute summed difference in lat and lon between
+            the subset of ccast_lats/ccast_lons and raw_lats/raw_lons.
+
+            To start I simply anchored the subset so that the top (highest latitude) ccast and raw rows match up (both ~81N).
+            Then the subset can be extended down 928 rows to lower latitudes (both ~27N).
+
+            This seems like a good start.
+
+            Next, I found the summed absolute lat + lon difference between the subset and the target raw_lats/raw_lons.
+            That is, I took a raw sized (928, 1530) slice from the ccast lon/lat (3712, 3712) and found the absolute lat + lon difference.
+            I did this by sliding the subset from the left edge to the right edge of the ccast width (3712) which allows for a 1530 wide subset.
+            Doing this I found the difference dropped consistently until column 1092, after which it climbed again.
+
+
+
+            This is a happy solution as a 1530 wide subset starting at column 1092 happens to be almost exactly 1090 columns from each edge.
+
+            Thus basically, it seems likely that the (928, 1530) from (3712, 3712) was done by taking the top 928 rows and then the middle 1530 columns.
+
+            I'll clean this up and post the code (and check that better fits aren't to be found).
+
+            occurs if we slide the subset
+            over to very close to the middle (edges equally far from edges of the ccast grid 3712 wide) so
+
+            1092 to 2622 is a slice of 1530 (correct) and very close to 1092 from the column edges (seems good)
+
+                Columns 1092-2622:
+                    Average abs lat difference is 0.0508 degrees
+                    Average abs lon difference is 0.0588 degrees
+
+            I found that we anchoring the subset so that the top (highest latitude) rows match up and then
+            sliding a 1530 column wide and
+
+            1092 to 2622 is a slice of 1530 (correct) and very close to 1092 from the column edges (seems good)
+
+            """
+            raw_top_row = euro_lats.shape[0] - 1
+            top_row = lats.shape[0]
+            raw_bot_row = 0
+            bot_row = lats.shape[0] - euro_lats.shape[0]
+            print(f"raw_top_row {raw_top_row:04d}")
+            print(f"top_row     {top_row:04d}")
+            print(f"raw_bot_row {raw_bot_row:04d}")
+            print(f"bot_row     {bot_row:04d}")
+
+            test_lats = lats[bot_row:top_row, :]
+            test_lats = np.nan_to_num(test_lats, nan=0, posinf=0, neginf=0)
+            print(f"test_lats {test_lats.shape}")
+            test_euro_lats = np.nan_to_num(euro_lats, nan=0, posinf=0, neginf=0)
+
+            test_lons = lons[bot_row:top_row, :]
+            test_lons = np.nan_to_num(test_lons, nan=0, posinf=0, neginf=0)
+            print(f"test_lons {test_lons.shape}")
+            test_euro_lons = np.nan_to_num(euro_lons, nan=0, posinf=0, neginf=0)
+
+            ##
+            # Scan along the row (by column) looking for a col_span set of lat diffs
+            ncols = lats.shape[1]
+            min_diff_col = -1
+            min_diff = 1e10
+            for iidx in range(ncols):
+                span_end = iidx + col_span
+                if span_end > ncols - 1:
+                    break
+                test_span_lats = test_lats[:, iidx:span_end]
+                test_span_lons = test_lons[:, iidx:span_end]
+                lat_diff = np.sum(np.abs(np.subtract(test_euro_lats, test_span_lats)))
+                lon_diff = np.sum(np.abs(np.subtract(test_euro_lons, test_span_lons)))
+                total_diff = lat_diff + lon_diff
+                if total_diff < min_diff:
+                    min_diff = total_diff
+                    min_diff_col = iidx
+                print(f"\t{iidx:04d}-{span_end}: {total_diff:10.1f} {np.mean(np.abs(np.subtract(test_euro_lats, test_span_lats)))} {np.mean(np.abs(np.subtract(test_euro_lons, test_span_lons)))}")
+                # if iidx == 1090:
+                #     print(f"\t{iidx:04d}-{span_end}: {total_diff:10.1f} {np.mean(np.abs(np.subtract(test_euro_lons[464, :], test_span_lons[464, :])))}")
+                #     print("diff", np.abs(np.subtract(test_euro_lons[464, :], test_span_lons[464, :])))
+                #     print(f"{test_euro_lons[464, :] = }")
+                #     print(f"{test_span_lons[464, :] = }\n")
+            print(f"Min Lat Col {min_diff_col} w/ diff {min_diff}")
+            os._exit(1)
+
+            # # row_diff = np.zeros((check_hieght, lats.shape[0]))
+            # row_diff = {}
+            # for jidx in range(lats.shape[0]):
+            #     if jidx < skip_to_bot:
+            #         continue
+            #     msg = f"\tlats {jidx:04d}:"
+            #     tmp = lats[jidx, :]
+            #     good_idx = np.nonzero(np.abs(tmp) <= 90.0)[0]
+            #     if len(good_idx) == 0:
+            #         print(f"{msg} NAN")
+            #         continue
+            #     else:
+            #         print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
+            #         ##
+            #         # Scan along the row (by column) looking for a col_span set of lat diffs
+            #         for iidx in range(lats.shape[1]):
+            #             test_span = lats[jidx, iidx:iidx + col_span]
+            #             raw_span =
+            #             # r_diff =
+            #             os._exit(1)
+
+        #   euro_lons (928, 1530): [-69.2706298828125   ... 69.2706298828125]
+        #   euro_lats (928, 1530): [ 26.67105484008789  ... 81.09877014160156]
+        #
+        #   lons (3712, 3712)    : [-81.12566375732422, ... 81.12566375732422]
+        #   lats (3712, 3712)    : [-81.0744857788086,  ... 81.0744857788086]
+
+        os._exit(1)
+
+        # 3712 x 3712
+        # 11136 x 5568
+
         # # lats (928, 3712) (1932430,): [26.656396865844727, ... 81.0744857788086]
         # # lats = lats[3712 - euro_nrows:, :]
 

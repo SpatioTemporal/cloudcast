@@ -147,7 +147,6 @@ GLOBE = ccrs.Globe(datum='WGS84', ellipse='WGS84')
 #   A 3D/spherical CRS based on latitude and longitude where geographical distance and coordinates are measured in degrees.
 GEOD_CRS = ccrs.Geodetic(globe=GLOBE)
 
-
 ##
 # Define CloudCast spatial stereographic projection coordinates CRS
 if use_raw:
@@ -374,6 +373,14 @@ def read_ccast(fname: str, get_coords: bool, as_raw: bool):
             if verbose:
                 print(f"y_coords ({len(y_coords)}): [{y_coords[0]:8.1f} ... {y_coords[-1]:8.1f}]")
                 print(f"x_coords ({len(x_coords)}): [{x_coords[0]:8.1f} ... {x_coords[-1]:8.1f}]")
+
+        # ##
+        # # Save x_coords, y_coords for lon/lat domain matching with MSG
+        # with open(f"{SAVE_DIR}raw_coords.pkl", 'wb') as f:
+        #     tmp = (x_coords, y_coords)
+        #     pickle.dump(tmp, f)
+        # os._exit(1)
+
     # ##
     # # To match flip and reverse of x_coords and y_coords
     # ccast_dat = np.swapaxes(ccast_dat, 0, 1)
@@ -395,7 +402,7 @@ def main():
 
     verbose = [False, True][1]
     just_one = [False, True][0]
-    recall_stats = [False, True][1]
+    recall_stats = [False, True][0]
 
     ##
     # Define stat storage
