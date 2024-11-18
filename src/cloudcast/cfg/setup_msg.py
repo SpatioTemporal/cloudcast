@@ -40,6 +40,8 @@ SetOut: TypeAlias = tuple[int, int, int, typing.TypeVar('cartopy.crs'),
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')]]
 
 ###############################################################################
@@ -117,6 +119,11 @@ def setup_msg(use_var: str, to_ccast:bool, to_euro:bool, to_merc:bool, to_lcc:bo
     msg_area_def = None
     msg_merc_area_def = None
     msg_merc_crs = None
+
+    raw_crs = None
+    raw_area_def = None
+    raw_merc_area_def = None
+    raw_merc_crs = None
 
     if to_ccast:
         ##
@@ -296,8 +303,124 @@ def setup_msg(use_var: str, to_ccast:bool, to_euro:bool, to_merc:bool, to_lcc:bo
             # print(f"ur_xy: {ur_xya}")
             # os._exit(1)
     elif to_euro:
-        print("Fix")
-        os._exit(1)
+        ##
+        # MSG subset (928, 1530)
+        #
+        #   lons_raw (928, 1530) (1258119,): [-69.23383331298828, ... 69.0114974975586]
+        #   lats_raw (928, 1530) (1258119,): [26.656396865844727, ... 81.0744857788086]
+
+        ##
+        # Geostationary Projection (GEOS) EPSG
+        #   https://proj4.org/en/9.2/operations/projections/geos.html
+        #       +proj=geos +h=42164000.0 +R=6378000.0 +lon_0=0 +sweep=y
+        #
+        #   https://scitools.org.uk/cartopy/docs/latest/reference/projections.html#geostationary
+        raw_crs = ccrs.Geostationary(central_longitude=0.0, satellite_height=42164000, globe=globe, sweep_axis='y')
+
+        RAW_HEIGHT = euro_nrows
+        RAW_WIDTH = euro_ncols
+        lower_left_xy = [-69.23383331298828, 26.656396865844727]
+        upper_right_xy = [69.0114974975586, 81.0744857788086]
+
+        # area_id = f"EPSG:{MSG_EPSG}"
+        area_id = f"GEOS"
+        description = "Partial Disk" if use_var == "HRV" else  "Full Disk"
+        proj_id = f"GEOS"
+
+        # ##
+        # # Define the area
+        # #   <class 'pyresample.geometry.AreaDefinition'>
+        # raw_area_def = pr.geometry.AreaDefinition(area_id, description, proj_id,
+        #                                           {'lat_0': '0.00', 'lat_ts': '0.00', 'lon_0': '0.00', 'proj': 'geos', 'h': '35786000.0', 'sweep': 'y'},
+        #                                           RAW_HEIGHT, RAW_WIDTH,
+        #                                           (lower_left_xy[0], lower_left_xy[1], upper_right_xy[0], upper_right_xy[1]))
+
+
+        upper_left_xy = [-2296808.8, 5570249.0]
+        lower_right_xy = [2293808.2, 2785874.8]
+        lat_min_max = [26.671055, 81.09877]
+        lon_min_max = [-69.27063, 69.27063]
+        raw_area_def = pr.geometry.AreaDefinition(area_id, description, proj_id,
+                                                  {'lat_0': '0.00', 'lat_ts': '0.00', 'lon_0': '0.00', 'proj': 'geos', 'h': '35785863.0', 'sweep': 'y'},
+                                                  RAW_HEIGHT, RAW_WIDTH,
+                                                  (upper_left_xy[0], upper_left_xy[1], lower_right_xy[0], lower_right_xy[1]))
+
+
+        ##
+        # Form a cartopy CRS
+        #   <class 'pyresample.utils.cartopy.Projection'>
+        raw_crs = raw_area_def.to_cartopy_crs()
+
+        # (-69.23383331298828, 69.0114974975586)
+        # (26.656396865844727, 81.0744857788086)
+        # print(raw_crs.x_limits)
+        # print(raw_crs.y_limits)
+
+        # print(raw_crs.bounds)
+        # os._exit(1)
+
+        if to_merc:
+            ##
+            # Form a Mercator CSR version of ccast_crs
+            raw_merc_crs = ccrs.epsg(MERC_EPSG)
+            if use_pseudo:
+                ##
+                # Mercator version EPSG:3857 for WGS 84 / Pseudo-Mercator -- Spherical Mercator, Google Maps, OpenStreetMap, Bing, ArcGIS, ESRI
+                #   https://epsg.io/3857
+                area_id = "EPSG:3857"
+                description = "Pseudo-Mercator"
+                proj_id = "EPSG:3857"
+            else:
+                ##
+                # World Mercator version EPSG:3395 for WGS 84
+                #   https://epsg.io/3395
+                area_id = "EPSG:3395"
+                description = "Mercator"
+                proj_id = "EPSG:3395"
+
+            #   ll_xy: (-9030867.579731662, 16261570.174893504)
+            #   ur_xy: (-9025170.473223472, 16224751.37493146)
+            ur_xy = raw_merc_crs.transform_point(upper_right_xy[0], upper_right_xy[1], geod_crs)
+            ll_xy = raw_merc_crs.transform_point(lower_left_xy[0], lower_left_xy[1], geod_crs)
+            # print(f"ll_xy: {ll_xy}")
+            # print(f"ur_xy: {ur_xy}")
+
+            ##
+            # Specify projection parameters
+            if use_pseudo:
+                projection = {'proj': 'merc', 'lat_ts': 0, 'lon_0': 0, 'a': 6378137, 'b': 6378137, 'x_0': 0, 'y_0': 0, 'k': 1, 'units': 'm'}
+            else:
+                projection = {'proj': 'merc','x_0': 0, 'y_0': 0, 'k': 1, 'units': 'm', 'no_defs': None, 'datum': 'WGS84', 'type': 'crs'}
+
+            ##
+            # Define the area
+            raw_merc_area_def = pr.geometry.AreaDefinition(area_id, 'Europe', proj_id,
+                                                           projection, RAW_HEIGHT, RAW_WIDTH,
+                                                           (ll_xy[0], ll_xy[1], ur_xy[0], ur_xy[1]))
+            #   proj4_string: +proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs
+            # print(f"proj4_string: {raw_merc_area_def.proj4_string}")
+            raw_merc_crs = raw_merc_area_def.to_cartopy_crs()
+            """
+            raw_merc_crs
+                raw_merc_area_corners  =[(-69.15934768216363, 81.06848731191593),  UL
+                                         (68.93701186673395, 81.06848731191593),   UR
+                                         (68.93701186673395, 26.691113310497318),  LR
+                                         (-69.15934768216363, 26.691113310497318)] LL
+
+                raw_merc_area_def.area_extent (-7707075.070068236, 3061443.8237934695, 7682324.760309496, 16224751.37493146)
+                raw_merc_crs.bounds           (-7707075.070068236, 3061443.8237934695, 7682324.760309496, 16224751.37493146)
+
+                ll_xy  = (-7707075.070068236, 3061443.8237934695) => (-69.15934768216363, 26.691113310497318)
+                ur_xy  = (7682324.760309496, 16224751.37493146)   => (68.93701186673395, 81.06848731191593)
+            """
+            # print(raw_merc_area_def.corners)
+            # print(raw_merc_area_def.area_extent)
+            # print(raw_merc_crs.bounds)
+            # ur_xya = geod_crs.transform_point(ur_xy[0], ur_xy[1], raw_merc_crs)
+            # ll_xya = geod_crs.transform_point(ll_xy[0], ll_xy[1], raw_merc_crs)
+            # print(f"ll_xy: {ll_xya}")
+            # print(f"ur_xy: {ur_xya}")
+            # os._exit(1)
     else:
         ##
         # Geostationary Projection (GEOS) EPSG
@@ -477,7 +600,8 @@ def setup_msg(use_var: str, to_ccast:bool, to_euro:bool, to_merc:bool, to_lcc:bo
 
     return (MSG_EPSG, MERC_EPSG, LCC_EPSG, geod_crs,
             ccast_area_def, ccast_crs, ccast_merc_area_def, ccast_merc_crs, ccast_lcc_area_def, ccast_lcc_crs,
-            msg_area_def, msg_crs, msg_merc_area_def, msg_merc_crs)
+            msg_area_def, msg_crs, msg_merc_area_def, msg_merc_crs,
+            raw_area_def, raw_crs, raw_merc_area_def, raw_merc_crs)
 
 # >>>> ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: <<<<
 # >>>> END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE <<<<

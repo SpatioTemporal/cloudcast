@@ -220,37 +220,30 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
                 ...
                 euro_lats 0927: NAN
 
-
+                euro_lons 0000: i_start = 0000   +24.7077 ... i_end = 1529   -24.7438
+                ...
+                euro_lons 0876: i_start = 0740    +4.8004 ... i_end = 0788    -4.8004
+                euro_lons 0877: NAN
+                ...
+                euro_lons 0927: NAN
             """
-
             euro_lats = euro_lats[::-1, ::-1]
             euro_lons = euro_lons[::-1, ::-1]
-            for jidx in range(euro_lons.shape[0]):
-                msg = f"euro_lons {jidx:04d}:"
-                tmp = euro_lons[jidx, :]
+            # for jidx in range(euro_lons.shape[0]):
+            #     msg = f"euro_lons {jidx:04d}:"
+            #     tmp = euro_lons[jidx, :]
 
-                # for euro_lats/euro_lons
-                good_idx = np.nonzero(~np.isnan(tmp))[0]
-
-                # for lats/lons
-                # good_idx = np.nonzero(~np.isinf(tmp))[0]
-                if len(good_idx) == 0:
-                    print(f"{msg} NAN")
-                    continue
-                else:
-                    print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
-            os._exit(1)
-            print("\n")
-
-            # for jidx in range(euro_lats.shape[0]):
-            #     msg = f"\teuro_lats {jidx:04d}:"
-            #     tmp = euro_lats[jidx, :]
+            #     # for euro_lats/euro_lons
             #     good_idx = np.nonzero(~np.isnan(tmp))[0]
+
+            #     # for lats/lons
+            #     # good_idx = np.nonzero(~np.isinf(tmp))[0]
             #     if len(good_idx) == 0:
             #         print(f"{msg} NAN")
             #         continue
             #     else:
             #         print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
+            # os._exit(1)
 
             ##
             # The minimum height is 928 rows of the starting 3712 rows
@@ -273,28 +266,26 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
 
             test_lats (928, 3712)
 
-            Min Lat Col 1090 w/ diff 40847800
-                1090+1530 = 2620
-                3712-2620 = 1092
+            Min Lat Col 1092 w/ diff 40847800
+                1092+1530 = 2622
+                3712-2622 = 1090
 
             Starting with
                  raw_lats (928, 1530) vs ccast_lats (3712, 3712)
                  raw_lons (928, 1530) vs ccast_lons (3712, 3712)
 
-            We want a subset of ccast_lats/ccast_lons that has the dimensions (928, 1530) and has the minimum absolute summed difference in lat and lon between
-            the subset of ccast_lats/ccast_lons and raw_lats/raw_lons.
+            We want a subset of MSG_lats/MSG_lons that has the dimensions (928, 1530) and has the minimum absolute summed difference in lat and lon between
+            the subset of MSG_lats/MSG_lons and raw_lats/raw_lons.
 
-            To start I simply anchored the subset so that the top (highest latitude) ccast and raw rows match up (both ~81N).
+            To start I simply anchored the subset so that the top (highest latitude) MSG and raw rows match up (both ~81N).
             Then the subset can be extended down 928 rows to lower latitudes (both ~27N).
 
             This seems like a good start.
 
             Next, I found the summed absolute lat + lon difference between the subset and the target raw_lats/raw_lons.
-            That is, I took a raw sized (928, 1530) slice from the ccast lon/lat (3712, 3712) and found the absolute lat + lon difference.
-            I did this by sliding the subset from the left edge to the right edge of the ccast width (3712) which allows for a 1530 wide subset.
+            That is, I took a raw sized (928, 1530) slice from the MSG lon/lat (3712, 3712) and found the absolute lat + lon difference.
+            I did this by sliding the subset from the left edge to the right edge of the MSG width (3712) which allows for a 1530 wide subset.
             Doing this I found the difference dropped consistently until column 1092, after which it climbed again.
-
-
 
             This is a happy solution as a 1530 wide subset starting at column 1092 happens to be almost exactly 1090 columns from each edge.
 
@@ -303,7 +294,7 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
             I'll clean this up and post the code (and check that better fits aren't to be found).
 
             occurs if we slide the subset
-            over to very close to the middle (edges equally far from edges of the ccast grid 3712 wide) so
+            over to very close to the middle (edges equally far from edges of the MSG grid 3712 wide) so
 
             1092 to 2622 is a slice of 1530 (correct) and very close to 1092 from the column edges (seems good)
 
@@ -335,6 +326,20 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
             test_lons = np.nan_to_num(test_lons, nan=0, posinf=0, neginf=0)
             print(f"test_lons {test_lons.shape}")
             test_euro_lons = np.nan_to_num(euro_lons, nan=0, posinf=0, neginf=0)
+
+            ##
+            # MSG subset (928, 1530)
+            lons_sub = lons[-928:, 1092:2622]
+            lats_sub = lats[-928:, 1092:2622]
+            if verbose:
+                tmp = lons_sub.flatten()
+                tmp = tmp[np.abs(tmp) <= 180.0]
+                print(f"\n\tlons_sub {lons_sub.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+                tmp = lats_sub.flatten()
+                tmp = tmp[np.abs(tmp) <= 90.0]
+                print(f"\tlats_sub {lats_sub.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+                del tmp
+            os._exit(1)
 
             ##
             # Scan along the row (by column) looking for a col_span set of lat diffs

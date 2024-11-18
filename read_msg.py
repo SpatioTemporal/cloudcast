@@ -41,7 +41,7 @@ make_tif = [False, True][0]
 
 ##
 # Read the nat file only
-read_nat = [False, True][1]
+read_nat = [False, True][0]
 
 ##
 # Make a figure
@@ -164,7 +164,7 @@ if read_nat:
 geo_stuff = setup_msg(use_dataset, as_ccast, as_euro, as_merc, as_lcc)
 (MSG_EPSG, MERC_EPSG, LCC_EPSG, geod_crs,
  ccast_area_def, ccast_crs, ccast_merc_area_def, ccast_merc_crs, ccast_lcc_area_def, ccast_lcc_crs,
- msg_area_def, msg_crs, msg_merc_area_def, msg_merc_crs) = geo_stuff
+ msg_area_def, msg_crs, msg_merc_area_def, msg_merc_crs, raw_area_def, raw_crs, raw_merc_area_def, raw_merc_crs) = geo_stuff
 # labels = ("MSG_EPSG", "MERC_EPSG", "geod_crs", "ccast_area_def", "ccast_crs", "ccast_merc_area_def", "ccast_lcc_area_def", "ccast_lcc_crs",
 #  "ccast_merc_crs", "msg_area_def", "msg_crs", "msg_merc_area_def", "msg_merc_crs")
 # for ii, ival in enumerate(tmp):
@@ -212,6 +212,11 @@ if make_fig:
             tif_name = TNAME.replace(".tif", "_merc.tif")
         else:
             tif_name = TNAME
+    elif as_euro:
+        if as_merc:
+            tif_name = TNAME.replace(".tif", "_merc.tif")
+        else:
+            tif_name = TNAME
     elif as_ccast:
         if as_merc:
             tif_name = TNAME.replace(".tif", "_merc.tif")
@@ -232,7 +237,12 @@ if make_fig:
             use_crs = msg_crs
             use_area_def = msg_area_def
     elif as_euro:
-        raise Exception("Add as_euro")
+        if as_merc:
+            use_crs = raw_merc_crs
+            use_area_def = raw_merc_area_def
+        else:
+            use_crs = raw_crs
+            use_area_def = raw_area_def
     elif as_ccast:
         if as_merc:
             use_crs = ccast_merc_crs
@@ -258,7 +268,16 @@ if make_fig:
         # ax = plt.axes(projection=proj)
         # ax = plt.axes(projection=use_crs)
     elif as_euro:
-        raise Exception("Add as_euro")
+        # ax = plt.axes(projection=ccrs.Miller())
+        # ax = plt.axes(projection=ccrs.Orthographic(central_longitude=0.0, central_latitude=0.0))
+        # ax = plt.axes(projection=ccrs.Mercator(central_longitude=0.0, min_latitude=-80.0, max_latitude=80.0))
+        #ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=0.0))
+        # ax = plt.axes(projection=ccrs.Geostationary(central_longitude=0.0)); as_geos = True
+
+        ax = plt.axes(projection=use_crs)
+        # proj = ccrs.PlateCarree(central_longitude=0.0, globe=ccrs.Globe(datum='WGS84', ellipse='WGS84'))
+        # ax = plt.axes(projection=proj)
+        # ax = plt.axes(projection=use_crs)
     elif as_ccast:
         ax = plt.axes(projection=use_crs)
         # ax = plt.axes(projection=ccrs.LambertConformal(central_longitude=0.0, central_latitude=0.0, cutoff=-30))
@@ -301,21 +320,13 @@ if make_fig:
         a_image = plt.imshow(data_vals, cmap=freq_map_cmap, transform=use_crs, extent=use_extent, origin='upper')
         ax.set_extent(use_extent, crs=use_crs)
     else:
-        # print(use_extent)
-        # (-81.12566375732422, -81.0744857788086, 81.12566375732422, 81.0744857788086)
-        # lower_left_xy = [-81.12566375732422, 81.12566375732422]
-        # upper_right_xy = [-81.0744857788086, 81.0744857788086]
-
-        # x_proj = use_crs.transform_point(use_extent[0], use_extent[2], proj)
-        # y_proj = use_crs.transform_point(use_extent[1], use_extent[3], proj)
-        # print(f"x_proj {x_proj}")
-        # print(f"y_proj: {y_proj}")
-        # use_extent = [x_proj[0], x_proj[1], y_proj[0], y_proj[1]]
-
         if use_dataset == "HRV":
             use_extent = [-2750000, 2750000, -5500000, 5500000]
         else:
-            use_extent = [-5500000, 5500000, -5500000, 5500000]
+            if as_euro:
+                use_extent = (-2296808.8, 2293808.2, 5570249.0, 2785874.8)
+            else:
+                use_extent = [-5500000, 5500000, -5500000, 5500000]
         # use_extent = [-6500000, 6500000, -6500000, 6500000]
         # use_extent = [-6500000, 6500000, -6500000, 6500000]
         # print(use_extent)

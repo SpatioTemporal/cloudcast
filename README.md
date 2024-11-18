@@ -195,6 +195,13 @@ Below is the summary "full_raw_cloud" cloud-type occurence RGB.
 
 ![CloudCast 928 x 1530 Geostationary](./images/ccast_raw_freq_map_z_RGB.png "CloudCast")
 
+Here is a  928 x 1530 subset of an MSG IR (3712 × 3712) data
+
+![Subset of 3712 x 3712 MSG IR, 928 x 1530 Geostationary](./images/raw_Geostationary.png "CloudCast")
+
+![Subset of MSG IR 10.8 $\mu$m Channel, 928 x 1530 Geostationary](./images/raw_dats_Geostationary.png "CloudCast")
+
+
 ### References
 
     CloudCast Github

@@ -41,6 +41,8 @@ SetOut: TypeAlias = tuple[int, int, int, typing.TypeVar('cartopy.crs'),
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
                      Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')]]
 
 ###############################################################################
@@ -87,7 +89,8 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
     # Unpack setup setup data
     (MSG_EPSG, MERC_EPSG, LCC_EPSG, geod_crs, ccast_area_def, ccast_crs, ccast_merc_area_def,
      ccast_merc_crs, ccast_lcc_area_def, ccast_lcc_crs, msg_area_def, msg_crs,
-     msg_merc_area_def, msg_merc_crs) = geo_dat
+     msg_merc_area_def, msg_merc_crs, raw_area_def, raw_crs, raw_merc_area_def,
+     raw_merc_crs) = geo_dat
 
     use_lcc_crs = None
     use_lcc_area_def = None
@@ -97,8 +100,10 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
         use_merc_crs = msg_merc_crs
         use_merc_area_def = msg_merc_area_def
     elif to_euro:
-        print("Fix to_euro")
-        os._exit(1)
+        use_crs = raw_crs
+        use_area_def = raw_area_def
+        use_merc_crs = raw_merc_crs
+        use_merc_area_def = raw_merc_area_def
     elif to_ccast:
         use_crs = ccast_crs
         use_area_def = ccast_area_def
@@ -140,11 +145,10 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
     """
     lons, lats = scn[fvar].area.get_lonlats()
     if to_euro:
-        if to_full:
-            lats = lats[3712 - euro_nrows:, :]
-            lons = lons[3712 - euro_nrows:, :]
-        else:
-            raise Exception("There 1sdbl")
+        ##
+        # MSG subset (928, 1530)
+        lons = lons[-928:, 1092:2622]
+        lats = lats[-928:, 1092:2622]
     if verbose:
         if to_full:
             print(f"\nMSG LatLon {fvar}")
@@ -168,10 +172,7 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
     """
     data_vals = scn[fvar].values
     if to_euro:
-        if to_full:
-            data_vals = data_vals[3712 - euro_nrows:, :]
-        else:
-            raise Exception("There 3dde")
+        data_vals = data_vals[-928:, 1092:2622]
     if verbose:
         tmp = data_vals.flatten()
         tmp = tmp[~np.isnan(tmp)]
