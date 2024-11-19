@@ -112,7 +112,19 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
         use_lcc_crs = ccast_lcc_crs
         use_lcc_area_def = ccast_lcc_area_def
 
+    # if fvar in ['VIS006', "HRV"]:
+    #     calibration = "reflectance"
+    # else:
+    #     calibration = "brightness_temperature"
     calibration = "radiance"
+    """
+
+    IR_039 calibration = "radiance"
+        data_vals (928, 1530): [0.003658667206764221, ... 1.4963948726654053]
+
+    IR_039 calibration = "", which I think defaults to "brightness_temperature"
+        data_vals (928, 1530): [204.75961303710938, ... 310.7130126953125]
+    """
     dtype = "float32"
     radius = 16000
     epsilon = 0.5
@@ -131,7 +143,8 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
 
     ##
     # Load the data, different calibration can be chosen
-    scn.load([fvar], calibration=calibration)
+    # scn.load([fvar], calibration=calibration)
+    scn.load([fvar])
 
     ##
     # Extract the longitude and latitude data
@@ -150,7 +163,7 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
         lons = lons[-928:, 1092:2622]
         lats = lats[-928:, 1092:2622]
     if verbose:
-        if to_full:
+        if to_full or to_euro:
             print(f"\nMSG LatLon {fvar}")
         else:
             print(f"\nCCAST Stereographic {fvar}")
@@ -178,6 +191,8 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
         tmp = tmp[~np.isnan(tmp)]
         print(f"\tdata_vals {data_vals.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
         del tmp
+
+    # os._exit(1)
 
     ##
     # Change the datatype of the arrays depending on the present data this can be changed

@@ -28,6 +28,8 @@ See setup.py to install the `cloudcast` package (or after adding any new modules
 ### Meteosat Second Generation (MSG) level 1.5 (sourced from Müller et al. 2019, Schmetz et al. 2002)
 
 #### Full-Disk (IR Channels)
+[>MSG] is an abbreviation.  So is [>(MSG) Markdown].
+
 MSG data is provided as full-disk (geostationary), meaning that roughly the complete North-South extent of the globe from the Atlantic to the Indian Ocean is present in each file. See FIG. 3 in Schmetz et al. (2002) and Figure 6 in Müller et al. 2019.
 
 ![Full-Disk (IR Channels, 3712 x 3712) Geostationary Projection](./images/full_frame_Geostationary.png "Geostationary")
@@ -195,12 +197,109 @@ Below is the summary "full_raw_cloud" cloud-type occurence RGB.
 
 ![CloudCast 928 x 1530 Geostationary](./images/ccast_raw_freq_map_z_RGB.png "CloudCast")
 
-Here is a  928 x 1530 subset of an MSG IR (3712 × 3712) data
+Our goal is to make a 928 x 1530 subset of an 3712 × 3712 MSG data for comparison. Starting with the '.nat' MSG files.
 
-![Subset of 3712 x 3712 MSG IR, 928 x 1530 Geostationary](./images/raw_Geostationary.png "CloudCast")
+```
+The base cloudcast MSG channels are ["VIS006", "IR_039", "IR_108", "IR_120"] marked "*" below
 
-![Subset of MSG IR 10.8 $\mu$m Channel, 928 x 1530 Geostationary](./images/raw_dats_Geostationary.png "CloudCast")
+    DataID(name='HRV',    wavelength=WavelengthRange(min=0.5,  central=0.7,   max=0.9,  unit='µm'), resolution=1000.134348869, calibration=<calibration.reflectance>,            modifiers=())
+    DataID(name='IR_016', wavelength=WavelengthRange(min=1.5,  central=1.64,  max=1.78, unit='µm'), resolution=3000.403165817, calibration=<calibration.reflectance>,            modifiers=())
+*   DataID(name='IR_039', wavelength=WavelengthRange(min=3.48, central=3.92,  max=4.36, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+    DataID(name='IR_087', wavelength=WavelengthRange(min=8.3,  central=8.7,   max=9.1,  unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+    DataID(name='IR_097', wavelength=WavelengthRange(min=9.38, central=9.66,  max=9.94, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+*   DataID(name='IR_108', wavelength=WavelengthRange(min=9.8,  central=10.8,  max=11.8, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+*   DataID(name='IR_120', wavelength=WavelengthRange(min=11.0, central=12.0,  max=13.0, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+    DataID(name='IR_134', wavelength=WavelengthRange(min=12.4, central=13.4,  max=14.4, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+*   DataID(name='VIS006', wavelength=WavelengthRange(min=0.56, central=0.635, max=0.71, unit='µm'), resolution=3000.403165817, calibration=<calibration.reflectance>,            modifiers=())
+    DataID(name='VIS008', wavelength=WavelengthRange(min=0.74, central=0.81,  max=0.88, unit='µm'), resolution=3000.403165817, calibration=<calibration.reflectance>,            modifiers=())
+    DataID(name='WV_062', wavelength=WavelengthRange(min=5.35, central=6.25,  max=7.15, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+    DataID(name='WV_073', wavelength=WavelengthRange(min=6.85, central=7.35,  max=7.85, unit='µm'), resolution=3000.403165817, calibration=<calibration.brightness_temperature>, modifiers=())
+```
 
+Note all of these channels are full-disk (3712 × 3712). That is, we don't need to mess with 'HRV' necessarily. So they can all be subseted as follows.
+```python
+##
+# MSG subset (928, 1530) from (3712, 3712)
+lons = lons[-928:, 1092:2622]
+lats = lats[-928:, 1092:2622]
+data_vals = data_vals[-928:, 1092:2622]
+```
+
+An oddity from the CloudCast Tutorial is the use of calibration = "radiance" when reading the files when from above it looks like "reflectance" and "brightness_temperature" should be used.
+This explains why the below images have units differing from what I would expect from an IR channel datasets (i.e., Brightness Temperature in deg K).
+
+These are based on `MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA.nat` or 2017-01-02 12:27 UTC.
+
+![Subset of 3712 x 3712 MSG, 928 x 1530 Geostationary](./images/raw_Geostationary.png "CloudCast")
+
+![Subset of MSG IR 3.92 $\mu$m Channel, 928 x 1530 Geostationary](./images/raw_IR_039_data_Geostationary.png "CloudCast")
+
+![Subset of MSG IR 10.8 $\mu$m Channel, 928 x 1530 Geostationary](./images/raw_IR_108_data_Geostationary.png "CloudCast")
+
+![Subset of MSG IR 12.0 $\mu$m Channel, 928 x 1530 Geostationary](./images/raw_IR_120_data_Geostationary.png "CloudCast")
+
+![Subset of MSG VIS 0.635 $\mu$m Channel, 928 x 1530 Geostationary](./images/raw_VIS006_data_Geostationary.png "CloudCast")
+
+If instead of reading the ".nat" file and saving as a GTif, I just read the ".nat" file I can get "reflectance" and "brightness_temperature" values.
+
+![Subset of MSG IR 3.92 $\mu$m Channel Brightness Temperature [K], 928 x 1530 Geostationary](./images/raw_IR_039_BT_Geostationary.png "CloudCast")
+
+![Subset of MSG IR 10.8 $\mu$m Channel Brightness Temperature [K], 928 x 1530 Geostationary](./images/raw_IR_108_BT_Geostationary.png "CloudCast")
+
+![Subset of MSG IR 12.0 $\mu$m Channel Brightness Temperature [K], 928 x 1530 Geostationary](./images/raw_IR_120_BT_Geostationary.png "CloudCast")
+
+![Subset of MSG VIS 0.635 $\mu$m Channel Reflectance, 928 x 1530 Geostationary](./images/raw_VIS006_Rf_Geostationary.png "CloudCast")
+
+
+### Terms
+
+**Meteosat Second Generation (MSG)**
+:    A series of geostationary meteorological satellites operated by EUMETSAT under the Meteosat Transition Programme and the Meteosat Second Generation program.
+
+**Infrared (IR) Channel**
+:    Electromagnetic radiation with wavelengths longer than that of visible light but shorter than microwaves (750 nm to 1 mm).
+:    IR is essentially heat energy.
+:    The MSG satellites measure IR radiation which is emitted by the Earth and cloud based on their temperature (radiance).
+:    These measurements occur over a range of wavelengths, called bands and/or channels.
+
+**Radiance**
+:    Energy emitted per unit time in a specified direction by a unit area of an emitting surface.
+:    Spectral radiance or specific intensity is the radiance over a specific range of electromagnetic radiation wavelengths (i.e., a channel).
+:    Spectral radiance has units of the watt per steradian (square radian, angle) per square meter per meter or $W sr^{−1} m^{−3}$.
+:    Most commonly measured by IR channels.
+
+**Brightness Temperature**
+:    Also called radiance temperature.
+:    A measure of the intensity of electromagnetic energy coming from a source (i.e., radiance).
+:    The temperature at which a black-body would have to be in order to match the radiance over a specific range of electromagnetic radiation wavelengths (i.e., a channel).
+:    Brightness temperature has units of degree Kelvin (K).
+
+**Reflectance**
+:    Similar idea as radiance, except related to electromagnetic radiation that is reflected (rather than emitted) by a surface.
+:    Specifically, reflectance is the ratio of the amount of light leaving a target to the amount of light striking the target.
+:    Generally measured for visiable channels.
+:    Reflectance It has no units.
+
+**Full-Disk**
+:    MSG data is provided as a full-disk (geostationary), meaning that roughly the complete North-South extent of the globe from the Atlantic to the Indian Ocean is present in each file.
+:    Spatial sampling distance of 3 km for 11 infrared (IR) channels.
+:    The full-disk image has 3712 x 3712 pixels (N-S by E-W).
+
+**Partial-Disk**
+:    MSG data from the visible spectrum that is higher resolution than the Full-Disk data.
+:    Spatial sampling distance of 1 km.
+:    The partial-disk image has 11136 x 5568 pixels (N-S by E-W).
+
+**Map Projection**
+:     A broad set of mathematical transformations from 3D spherical coordinates (longitude, latitude, radial distance from center of Earth) to nonspherical (generally flat) 2D surface and Cartesian coordinates (often units of distance).
+
+**CloudCast**
+:    A cloud type/amount dataset based on analysis of MSG data.
+:    CloudCast uses four MSG channels: One visible channel "VIS006" 0.56-0.71 $\mu m$, two IR channels "IR_039" 3.48-4.36 $\mu m$ and "IR_120" 11.0-13.0 $\mu m$, and one water vapor channel "IR_108" 9.8-11.8 $\mu m$.
+:    CloudCast data come in 3 forms.
+:     **Small** Dataset (128×128), which is downsampled from the cropped-dataset.
+:     **Cropped** Full Dataset (768×768), which is projected and interpolated from the raw-dataset.
+:     **Raw** Full Dataset (928×1530), a subset of the full-disk (3712x3712) MSG geostationary data.
 
 ### References
 

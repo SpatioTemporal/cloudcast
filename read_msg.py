@@ -19,6 +19,7 @@ import pyresample as pr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+from satpy import Scene
 
 # STARE Imports
 
@@ -46,6 +47,10 @@ read_nat = [False, True][0]
 ##
 # Make a figure
 make_fig = [False, True][1]
+
+##
+# Read nat rather than tif
+use_nat = [False, True][1]
 
 ##
 # Select Domain (only one can be True)
@@ -92,7 +97,7 @@ as_region = [False, True][0]
 
 ##
 # Obvious
-verbose = [False, True][1]
+verbose = [False, True][0]
 
 ##
 # From scn.all_dataset_names() below
@@ -105,11 +110,23 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 
 ##
 # Just HRV
-# use_dataset = ds_names[0]
+# use_dataset = ds_names[ds_names.index("HRV")]
+
+##
+# Just IR_039
+# use_dataset = ds_names[ds_names.index("IR_039")]
 
 ##
 # Just IR_108
-use_dataset = ds_names[3]
+# use_dataset = ds_names[ds_names.index("IR_108")]
+
+##
+# Just IR_120
+# use_dataset = ds_names[ds_names.index("IR_120")]
+
+##
+# Just VIS006
+use_dataset = ds_names[ds_names.index("VIS006")]
 
 ##
 # Define path to folder
@@ -120,6 +137,8 @@ BASENAME = ["MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA",
 SUB_PATH = f"{FILE_PATH}{BASENAME}/"
 FNAME = f"{SUB_PATH}{BASENAME}.nat"
 TNAME = f"{SUB_PATH}{BASENAME}_{use_dataset}_{use_tag}.tif"
+if use_nat:
+    TNAME = FNAME
 if verbose:
     print(f"{'Making' if make_tif else 'Reading'}: {TNAME}")
 
@@ -128,6 +147,8 @@ if verbose:
 freq_map_cmap = ["plasma", "gist_ncar_r", "bone_r", "nipy_spectral"][2]
 if as_region:
     freq_map_cmap = "bone_r"
+if use_nat:
+    freq_map_cmap = "bone"
 
 ##
 # Define reader (GDAL)
@@ -207,26 +228,57 @@ if make_fig:
     #   ds.GetGeoTransform()  = (-855100.436345, 3000.0, 0.0, -2638000.0, 0.0, -3000.0)
     #   ds.GetProjection()    = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
 
-    if as_full:
-        if as_merc:
-            tif_name = TNAME.replace(".tif", "_merc.tif")
-        else:
-            tif_name = TNAME
-    elif as_euro:
-        if as_merc:
-            tif_name = TNAME.replace(".tif", "_merc.tif")
-        else:
-            tif_name = TNAME
-    elif as_ccast:
-        if as_merc:
-            tif_name = TNAME.replace(".tif", "_merc.tif")
-        elif as_lcc:
-            tif_name = TNAME.replace(".tif", "_lcc.tif")
-        else:
-            tif_name = TNAME
-    ds = gdal.Open(tif_name)
-    band = ds.GetRasterBand(1)
-    data_vals = band.ReadAsArray()
+    if use_nat:
+        # if fvar in ['VIS006', "HRV"]:
+        #     calibration = "reflectance"
+        # else:
+        #     calibration = "brightness_temperature"
+        calibration = "radiance"
+        dtype = "float32"
+        radius = 16000
+        epsilon = 0.5
+        nodata = -3.4E+38
+
+        ##
+        # Open the file w/ satpy, which uses Xarray
+        #   <class 'satpy.scene.Scene'>
+        scn = Scene(filenames = {reader: [TNAME]})
+        ##
+        # Load the data, different calibration can be chosen
+        # scn.load([fvar], calibration=calibration)
+        scn.load([use_dataset])
+        data_vals = scn[use_dataset].values
+        if as_euro:
+            data_vals = data_vals[-928:, 1092:2622]
+    else:
+        if as_full:
+            if as_merc:
+                tif_name = TNAME.replace(".tif", "_merc.tif")
+            else:
+                tif_name = TNAME
+        elif as_euro:
+            if as_merc:
+                tif_name = TNAME.replace(".tif", "_merc.tif")
+            else:
+                tif_name = TNAME
+        elif as_ccast:
+            if as_merc:
+                tif_name = TNAME.replace(".tif", "_merc.tif")
+            elif as_lcc:
+                tif_name = TNAME.replace(".tif", "_lcc.tif")
+            else:
+                tif_name = TNAME
+
+        ds = gdal.Open(tif_name)
+        band = ds.GetRasterBand(1)
+        data_vals = band.ReadAsArray()
+
+    # print(use_dataset, np.amin(data_vals), np.amax(data_vals))
+    # tmp = data_vals.flatten()
+    # tmp = tmp[~np.isnan(tmp)]
+    # print(np.amin(tmp), np.amax(tmp))
+    # os._exit(1)
+
     if as_region:
         data_vals = np.where(data_vals >= 0, 1, 0)
     if as_full:
@@ -338,17 +390,65 @@ if make_fig:
         the_alpha = 1.0
         if use_dataset == "HRV":
             # bounds = np.linspace(0.0, 15.0, num=16, endpoint=True)
-            bounds = np.linspace(0.0, 25.0, num=11, endpoint=True)
             the_min = 0.0
             the_max = 25.0
+            bounds = np.linspace(the_min, the_max, num=11, endpoint=True)
+        elif use_dataset == "IR_108":
+            the_min = 0.0
+            the_max = 120.0
+            bounds = np.linspace(the_min, the_max, num=20, endpoint=True)
+            if use_nat:
+                # print(use_dataset, np.amin(data_vals), np.amax(data_vals))
+                # tmp = data_vals.flatten()
+                # tmp = tmp[~np.isnan(tmp)]
+                # print(use_dataset, np.amin(tmp), np.amax(tmp))
+                # IR_108 211.34976 305.07642
+                the_min = 200
+                the_max = 310
+                bounds = np.linspace(the_min, the_max, num=23, endpoint=True)
+        elif use_dataset == "IR_120":
+            the_min = 0.0
+            the_max = 140.0
+            bounds = np.linspace(the_min, the_max, num=20, endpoint=True)
+            if use_nat:
+                # print(use_dataset, np.amin(data_vals), np.amax(data_vals))
+                # tmp = data_vals.flatten()
+                # tmp = tmp[~np.isnan(tmp)]
+                # print(use_dataset, np.amin(tmp), np.amax(tmp))
+                # # IR_120 202.00209 305.52527
+                the_min = 200
+                the_max = 310
+                bounds = np.linspace(the_min, the_max, num=23, endpoint=True)
+        elif use_dataset == "VIS006":
+            the_min = 0.0
+            the_max = 10.0
+            bounds = np.linspace(the_min, the_max, num=10, endpoint=True)
+            if use_nat:
+                print(use_dataset, np.amin(data_vals), np.amax(data_vals))
+                tmp = data_vals.flatten()
+                tmp = tmp[~np.isnan(tmp)]
+                print(use_dataset, np.amin(tmp), np.amax(tmp))
+                the_min = 0
+                the_max = 64
+                bounds = np.linspace(the_min, the_max, num=17, endpoint=True)
+        elif use_dataset == "IR_039":
+            the_min = 0.0
+            the_max = 1.0
+            bounds = np.linspace(the_min, the_max, num=11, endpoint=True)
+            if use_nat:
+                # print(use_dataset, np.amin(data_vals), np.amax(data_vals))
+                # tmp = data_vals.flatten()
+                # tmp = tmp[~np.isnan(tmp)]
+                # print(use_dataset, np.amin(tmp), np.amax(tmp))
+                # # IR_039 204.75961 310.713
+                the_min = 200
+                the_max = 310
+                bounds = np.linspace(the_min, the_max, num=23, endpoint=True)
         else:
-            bounds = np.linspace(0.0, 4.0, num=16, endpoint=True)
             the_min = 0.0
             the_max = 4.0
-
-            bounds = np.linspace(0.0, 100.0, num=26, endpoint=True)
-            the_min = 0.0
-            the_max = 100.0
+            bounds = np.linspace(the_min, the_max, num=16, endpoint=True)
+            # print(use_dataset, np.amin(data_vals), np.amax(data_vals))
         if as_region:
             bounds = np.linspace(0.0, 1.0, num=2, endpoint=True)
             the_min = 0.0

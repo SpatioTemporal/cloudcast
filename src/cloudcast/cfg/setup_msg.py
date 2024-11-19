@@ -69,7 +69,7 @@ def setup_msg(use_var: str, to_ccast:bool, to_euro:bool, to_merc:bool, to_lcc:bo
     SetOut
         Tuple of geometry information for the specified projection and variable.
     """
-    verbose = [False, True][1]
+    verbose = [False, True][0]
 
     euro_nrows = 928
     euro_ncols = 1530
