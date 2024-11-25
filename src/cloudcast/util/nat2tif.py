@@ -143,8 +143,8 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
 
     ##
     # Load the data, different calibration can be chosen
-    # scn.load([fvar], calibration=calibration)
-    scn.load([fvar])
+    scn.load([fvar], calibration=calibration)
+    # scn.load([fvar])
 
     ##
     # Extract the longitude and latitude data
@@ -271,6 +271,9 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
     outRasterSRS = osr.SpatialReference() # create CRS instance
     outRasterSRS.ImportFromEPSG(MSG_EPSG) # get info for EPSG 4326
     outRaster.SetProjection(outRasterSRS.ExportToWkt()) # set CRS as WKT
+
+    # Band 1 Block=1530x5 Type=Byte, ColorInterp=Gray
+    #   NoData Value=-3.4e+38
 
     ##
     # Clean up
