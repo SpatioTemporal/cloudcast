@@ -3,3 +3,4 @@ Icon
 node_modules/
 .DS_Store
 cloudcast.egg-info/
+hidden/
