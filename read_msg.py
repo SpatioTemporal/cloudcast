@@ -11,6 +11,7 @@ $ python read_msg.py
 # Standard Imports
 import os
 import pickle
+from pathlib import Path
 
 # Third-Party Imports
 import numpy as np
@@ -20,6 +21,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 from satpy import Scene
+from zipfile import ZipFile
 
 # STARE Imports
 
@@ -41,7 +43,7 @@ __docformat__ = "Numpydoc"
 make_tif = [False, True][0]
 
 ##
-# Read the nat file only
+# Read the nat file only (not geotif or plots)
 read_nat = [False, True][0]
 
 ##
@@ -51,6 +53,10 @@ make_fig = [False, True][1]
 ##
 # Read nat rather than tif
 use_nat = [False, True][1]
+
+##
+# Read .nat from .zip (use with use_nat and read_nat)
+zip2nat = [False, True][1]
 
 ##
 # Select Domain (only one can be True)
@@ -97,7 +103,7 @@ as_region = [False, True][0]
 
 ##
 # Obvious
-verbose = [False, True][0]
+verbose = [False, True][1]
 
 ##
 # From scn.all_dataset_names() below
@@ -109,34 +115,48 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 #   These are the base cloudcast fields  ["VIS006", "IR_039", "IR_108", "IR_120"]
 
 ##
-# Just HRV
+# Just HRV  Window/Water Vapor Channel
 # use_dataset = ds_names[ds_names.index("HRV")]
 
 ##
-# Just IR_039
+# Just IR_039 IR Window Channel
 # use_dataset = ds_names[ds_names.index("IR_039")]
 
 ##
-# Just IR_108
-# use_dataset = ds_names[ds_names.index("IR_108")]
+# Just IR_087 IR Window Channel
+# use_dataset = ds_names[ds_names.index("IR_087")]
 
 ##
-# Just IR_120
+# Just WV_073 IR Water vapor
+# use_dataset = ds_names[ds_names.index("WV_073")]
+
+##
+# Just IR_108 IR Window Channel
+use_dataset = ds_names[ds_names.index("IR_108")]
+
+##
+# Just IR_120 IR Window Channel
 # use_dataset = ds_names[ds_names.index("IR_120")]
 
 ##
-# Just VIS006
-use_dataset = ds_names[ds_names.index("VIS006")]
+# Just VIS006 Visible Window Channel
+# use_dataset = ds_names[ds_names.index("VIS006")]
+
+##
+# Just VIS008 Visible Window Channel
+# use_dataset = ds_names[ds_names.index("VIS008")]
 
 ##
 # Define path to folder
 FILE_PATH = "/Users/mbauer/tmp/CloudCast/msg/"
-BASENAME = ["MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA",
+BASENAME = ["MSG3-SEVI-MSG15-0100-NA-20170601001240.835000000Z-NA",
+            "MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA",
             "MSG3-SEVI-MSG15-0100-NA-20170102122740.989000000Z-NA",
-            "MSG3-SEVI-MSG15-0100-NA-20170104005740.099000000Z-NA"][1]
+            "MSG3-SEVI-MSG15-0100-NA-20170104005740.099000000Z-NA"][0]
 SUB_PATH = f"{FILE_PATH}{BASENAME}/"
 FNAME = f"{SUB_PATH}{BASENAME}.nat"
 TNAME = f"{SUB_PATH}{BASENAME}_{use_dataset}_{use_tag}.tif"
+ZNAME = f"{FILE_PATH}{BASENAME}.zip"
 if use_nat:
     TNAME = FNAME
 if verbose:
@@ -160,7 +180,7 @@ if as_euro:
     # Read raw_lons, raw_lats for CloudCast raw for lon/lat domain matching with MSG
     #   raw_lons (928, 1530): [-69.2706298828125  ... 69.2706298828125]
     #   raw_lats (928, 1530): [ 26.67105484008789 ... 81.09877014160156]
-    with open(f"/Volumes/saved/hidden/cloudcast/raw_coords.pkl", 'rb') as f:
+    with open(f"/Users/mbauer/tmp/CloudCast/raw_coords.pkl", 'rb') as f:
         tmp = pickle.load(f)
         raw_lons, raw_lats = tmp
         del tmp
@@ -177,7 +197,7 @@ else:
 if read_nat:
     ##
     # Read the file
-    natread(fname=FNAME, fvar=use_dataset, reader=reader, to_euro=as_euro, euro_lons=raw_lons, euro_lats=raw_lats)
+    natread(fname=FNAME, fvar=use_dataset, reader=reader, to_euro=as_euro, euro_lons=raw_lons, euro_lats=raw_lats, fromzip=zip2nat)
     os._exit(1)
 
 ##
@@ -229,27 +249,46 @@ if make_fig:
     #   ds.GetProjection()    = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
 
     if use_nat:
-        # if fvar in ['VIS006', "HRV"]:
-        #     calibration = "reflectance"
-        # else:
-        #     calibration = "brightness_temperature"
-        calibration = "radiance"
-        dtype = "float32"
-        radius = 16000
-        epsilon = 0.5
-        nodata = -3.4E+38
-
+        if zip2nat:
+            zpath = Path(FNAME)
+            zfile = f"{zpath.parent}.zip"
+            ffile = f"{zpath.name}"
+            with ZipFile(zfile, 'r') as zip:
+                TNAME = zip.extract(ffile)
         ##
         # Open the file w/ satpy, which uses Xarray
         #   <class 'satpy.scene.Scene'>
         scn = Scene(filenames = {reader: [TNAME]})
+
+        ##
+        # Get calibration
+        scn.load([use_dataset])
+        fvar__ = scn[use_dataset]
+        fvar__atts = fvar__.attrs
+        # print(fvar__atts)
+        fvar_units = fvar__atts['units']
+        fvar_name = fvar__atts['standard_name']
+        use_calibration = fvar__atts['calibration']
+        if verbose:
+            print(f"\tcalibration '{use_calibration}' w/ units of {fvar_units}")
+        del fvar__
+
+        # calibration = "radiance"
+        # dtype = "float32"
+        # radius = 16000
+        # epsilon = 0.5
+        # nodata = -3.4E+38
+
         ##
         # Load the data, different calibration can be chosen
-        # scn.load([fvar], calibration=calibration)
-        scn.load([use_dataset])
+        scn.load([use_dataset], calibration=use_calibration)
+        # scn.load([use_dataset])
         data_vals = scn[use_dataset].values
         if as_euro:
             data_vals = data_vals[-928:, 1092:2622]
+
+        if zip2nat:
+            os.remove(TNAME)
     else:
         if as_full:
             if as_merc:

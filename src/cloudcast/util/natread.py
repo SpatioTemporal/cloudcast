@@ -11,6 +11,7 @@ import os
 import copy
 import typing
 from typing import Optional, Union, TypeAlias
+from pathlib import Path
 
 # Third-Party Imports
 import numpy as np
@@ -22,6 +23,8 @@ import pyresample as pr
 from satpy import Scene
 import cartopy
 import cartopy.crs as ccrs
+from zipfile import ZipFile
+
 
 # STARE Imports
 
@@ -41,7 +44,7 @@ __docformat__ = "Numpydoc"
 ###############################################################################
 # PUBLIC natread()
 # ----------------
-def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.ArrayLike, euro_lats: npt.ArrayLike) -> None:
+def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.ArrayLike, euro_lats: npt.ArrayLike, fromzip: bool) -> None:
 
     verbose = [False, True][1]
 
@@ -94,26 +97,27 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
     scn.images() =
         <generator object Scene.images at 0x14849f920>
     """
+
+    if fromzip:
+        zpath = Path(fname)
+        zfile = f"{zpath.parent}.zip"
+        ffile = f"{zpath.name}"
+        with ZipFile(zfile, 'r') as zip:
+            fname = zip.extract(ffile)
     scn = Scene(filenames = {reader:[fname]})
     # print(scn.values())
 
-    # ##
-    # # Extract data set names
-    # dataset_names = scn.all_dataset_names()
-    # """
-    #     HRV
-    #     IR_016
-    #     IR_039
-    #     IR_087
-    #     IR_097
-    #     IR_108
-    #     IR_120
-    #     IR_134
-    #     VIS006
-    #     VIS008
-    #     WV_062
-    #     WV_073
-    # """
+    ##
+    # Get calibration
+    scn.load([fvar])
+    fvar__ = scn[fvar]
+    fvar__atts = fvar__.attrs
+    fvar_units = fvar__atts['units']
+    fvar_name = fvar__atts['standard_name']
+    use_calibration = fvar__atts['calibration']
+    if verbose:
+        print(f"\tcalibration '{use_calibration}' w/ units of {fvar_units}")
+    del fvar__
 
     ##
     # Extract wanted data
@@ -134,18 +138,33 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         good_lons (10213685): [-75.26545715332031 ... 75.56462097167969]
         good_lats (10213685): [-78.95874786376953 ... 78.29975891113281]
     """
-    lons, lats, data_vals = readnat(file=fname, calibration="radiance", dataset=fvar, reader=reader, dtype="float32")
+    lons, lats, data_vals = readnat(file=fname, calibration=use_calibration, dataset=fvar, reader=reader, dtype="float32")
     if verbose:
         tmp = lons.flatten()
+        tmp_len = len(tmp)
         tmp = tmp[np.abs(tmp) <= 180.0]
-        print(f"\n\tlons {lons.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+        tmp1_len = len(tmp)
+        len_frac = 100.0 * (tmp1_len / tmp_len)
+        print(f"\n\tlons {lons.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
         tmp = lats.flatten()
+        tmp_len = len(tmp)
         tmp = tmp[np.abs(tmp) <= 90.0]
-        print(f"\tlats {lats.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+        tmp1_len = len(tmp)
+        len_frac = 100.0 * (tmp1_len / tmp_len)
+        print(f"\tlats {lats.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
         tmp = data_vals.flatten()
+        tmp_len = len(tmp)
         tmp = tmp[~np.isnan(tmp)]
-        print(f"\tdata_vals {data_vals.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+        tmp = tmp[tmp > 0.0]
+        tmp1_len = len(tmp)
+        len_frac = 100.0 * (tmp1_len / tmp_len)
+        print(f"\tdata_vals {data_vals.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
         del tmp
+
+    if fromzip:
+        os.remove(fname)
+
+
     if to_euro:
         #   euro_lons (928, 1530): [-69.2706298828125   ... 69.2706298828125]
         #   euro_lats (928, 1530): [ 26.67105484008789  ... 81.09877014160156]
@@ -158,10 +177,7 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         #   lats (11136, 5568)   : [-81.13614654541016, ... 81.13614654541016]
         """
             euro_lats (928, 1530) vs lats (3712, 3712)
-
         """
-
-
         if fvar == 'HRV':
             pass
         else:
@@ -308,193 +324,209 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
             1092 to 2622 is a slice of 1530 (correct) and very close to 1092 from the column edges (seems good)
 
             """
-            raw_top_row = euro_lats.shape[0] - 1
-            top_row = lats.shape[0]
-            raw_bot_row = 0
-            bot_row = lats.shape[0] - euro_lats.shape[0]
-            print(f"raw_top_row {raw_top_row:04d}")
-            print(f"top_row     {top_row:04d}")
-            print(f"raw_bot_row {raw_bot_row:04d}")
-            print(f"bot_row     {bot_row:04d}")
+            # raw_top_row = euro_lats.shape[0] - 1
+            # top_row = lats.shape[0]
+            # raw_bot_row = 0
+            # bot_row = lats.shape[0] - euro_lats.shape[0]
+            # print(f"raw_top_row {raw_top_row:04d}")
+            # print(f"top_row     {top_row:04d}")
+            # print(f"raw_bot_row {raw_bot_row:04d}")
+            # print(f"bot_row     {bot_row:04d}")
 
-            test_lats = lats[bot_row:top_row, :]
-            test_lats = np.nan_to_num(test_lats, nan=0, posinf=0, neginf=0)
-            print(f"test_lats {test_lats.shape}")
-            test_euro_lats = np.nan_to_num(euro_lats, nan=0, posinf=0, neginf=0)
+            # test_lats = lats[bot_row:top_row, :]
+            # test_lats = np.nan_to_num(test_lats, nan=0, posinf=0, neginf=0)
+            # print(f"test_lats {test_lats.shape}")
+            # test_euro_lats = np.nan_to_num(euro_lats, nan=0, posinf=0, neginf=0)
 
-            test_lons = lons[bot_row:top_row, :]
-            test_lons = np.nan_to_num(test_lons, nan=0, posinf=0, neginf=0)
-            print(f"test_lons {test_lons.shape}")
-            test_euro_lons = np.nan_to_num(euro_lons, nan=0, posinf=0, neginf=0)
+            # test_lons = lons[bot_row:top_row, :]
+            # test_lons = np.nan_to_num(test_lons, nan=0, posinf=0, neginf=0)
+            # print(f"test_lons {test_lons.shape}")
+            # test_euro_lons = np.nan_to_num(euro_lons, nan=0, posinf=0, neginf=0)
 
             ##
             # MSG subset (928, 1530)
             lons_sub = lons[-928:, 1092:2622]
             lats_sub = lats[-928:, 1092:2622]
+            data_vals_sub = data_vals[-928:, 1092:2622]
             if verbose:
                 tmp = lons_sub.flatten()
+                tmp_len = len(tmp)
                 tmp = tmp[np.abs(tmp) <= 180.0]
-                print(f"\n\tlons_sub {lons_sub.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+                tmp1_len = len(tmp)
+                len_frac = 100.0 * (tmp1_len / tmp_len)
+                print(f"\n\tlons_euro {lons_sub.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
                 tmp = lats_sub.flatten()
+                tmp_len = len(tmp)
                 tmp = tmp[np.abs(tmp) <= 90.0]
-                print(f"\tlats_sub {lats_sub.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+                tmp1_len = len(tmp)
+                len_frac = 100.0 * (tmp1_len / tmp_len)
+                print(f"\tlats_euro {lats_sub.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+                tmp = data_vals_sub.flatten()
+                tmp_len = len(tmp)
+                tmp = tmp[~np.isnan(tmp)]
+                tmp = tmp[tmp > 0.0]
+                tmp1_len = len(tmp)
+                len_frac = 100.0 * (tmp1_len / tmp_len)
+                print(f"\tdata_vals_euro {data_vals_sub.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
                 del tmp
-            os._exit(1)
+            return
 
-            ##
-            # Scan along the row (by column) looking for a col_span set of lat diffs
-            ncols = lats.shape[1]
-            min_diff_col = -1
-            min_diff = 1e10
-            for iidx in range(ncols):
-                span_end = iidx + col_span
-                if span_end > ncols - 1:
-                    break
-                test_span_lats = test_lats[:, iidx:span_end]
-                test_span_lons = test_lons[:, iidx:span_end]
-                lat_diff = np.sum(np.abs(np.subtract(test_euro_lats, test_span_lats)))
-                lon_diff = np.sum(np.abs(np.subtract(test_euro_lons, test_span_lons)))
-                total_diff = lat_diff + lon_diff
-                if total_diff < min_diff:
-                    min_diff = total_diff
-                    min_diff_col = iidx
-                print(f"\t{iidx:04d}-{span_end}: {total_diff:10.1f} {np.mean(np.abs(np.subtract(test_euro_lats, test_span_lats)))} {np.mean(np.abs(np.subtract(test_euro_lons, test_span_lons)))}")
-                # if iidx == 1090:
-                #     print(f"\t{iidx:04d}-{span_end}: {total_diff:10.1f} {np.mean(np.abs(np.subtract(test_euro_lons[464, :], test_span_lons[464, :])))}")
-                #     print("diff", np.abs(np.subtract(test_euro_lons[464, :], test_span_lons[464, :])))
-                #     print(f"{test_euro_lons[464, :] = }")
-                #     print(f"{test_span_lons[464, :] = }\n")
-            print(f"Min Lat Col {min_diff_col} w/ diff {min_diff}")
-            os._exit(1)
 
-            # # row_diff = np.zeros((check_hieght, lats.shape[0]))
-            # row_diff = {}
-            # for jidx in range(lats.shape[0]):
-            #     if jidx < skip_to_bot:
-            #         continue
-            #     msg = f"\tlats {jidx:04d}:"
-            #     tmp = lats[jidx, :]
-            #     good_idx = np.nonzero(np.abs(tmp) <= 90.0)[0]
-            #     if len(good_idx) == 0:
-            #         print(f"{msg} NAN")
-            #         continue
-            #     else:
-            #         print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
-            #         ##
-            #         # Scan along the row (by column) looking for a col_span set of lat diffs
-            #         for iidx in range(lats.shape[1]):
-            #             test_span = lats[jidx, iidx:iidx + col_span]
-            #             raw_span =
-            #             # r_diff =
-            #             os._exit(1)
-
-        #   euro_lons (928, 1530): [-69.2706298828125   ... 69.2706298828125]
-        #   euro_lats (928, 1530): [ 26.67105484008789  ... 81.09877014160156]
-        #
-        #   lons (3712, 3712)    : [-81.12566375732422, ... 81.12566375732422]
-        #   lats (3712, 3712)    : [-81.0744857788086,  ... 81.0744857788086]
-
-        os._exit(1)
-
-        # 3712 x 3712
-        # 11136 x 5568
-
-        # # lats (928, 3712) (1932430,): [26.656396865844727, ... 81.0744857788086]
-        # # lats = lats[3712 - euro_nrows:, :]
-
-        # # row (jj) starts at S and moves N
-        # # col (ii) starts in E and moves W
-        # # lons[jj, ii] where jj is row and ii is column
-        # # 45W - 30E
-
-        # # # jj = 2652 ii = 3146: (lat, lon) (23.81135368347168, -45.049129486083984)
-        # # jj = 2652
-        # # ii = 3146
-        # # print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
-
-        # # # jj = 2652 ii =  910: (lat, lon) (23.114727020263672, 30.13174819946289)
-        # # jj = 2652
-        # # ii = 910
-        # # print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
-
-        # # jj = 2652 ii =  910: (lat, lon) (23.114727020263672, 30.13174819946289)
-        # jj = 2652
-        # ii = 3146 - euro_ncols
-        # print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
-
-        # 3146 - 1530 = 1616
-        # # euro_nrows = 928
-        # # euro_ncols = 1530
-        # # 3146-910 = 2236
-        # # 2236 - 1530 = 706
-        # os._exit(1)
-
-        # dones = 0
-        # for jj in range(3712):
-        #     for ii in range(3712):
-        #         if np.abs(lons[jj, ii]) <= 180.0 and np.abs(lats[jj, ii] <= 90.0):
-        #             if lats[jj, ii] >= 26.0 and lons[jj, ii] <= -45:
-        #                 print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
-        #                 dones += 1
-        #     # if dones > 5:
-        #     #     os._exit(1)
-
-        lats = lats[3712 - euro_nrows:, :]
-        lons = lons[3712 - euro_nrows:, :]
-
-        # 45W - 30E
-        # 3712-1530
-        if verbose:
-            tmp = lons.flatten()
-            tmp = tmp[np.abs(tmp) <= 180.0]
-            print(f"\n\tlons {lons.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
-            tmp = lats.flatten()
-            tmp = tmp[np.abs(tmp) <= 90.0]
-            print(f"\tlats {lats.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
-            del tmp
-
-    # ny, nx = lons.shape
-    # # for yidx in range(53, 60):
-    # for yidx in range(ny):
-    #     left_good_idx = -1
-    #     right_good_idx = -1
-    #     ## print(f"Checking {yidx = :5d}")
-    #     for xidx in range(nx):
-    #         ## print(f"\tChecking {xidx = :5d} {data_vals[yidx, xidx]}")
-    #         if np.isnan(data_vals[yidx, xidx]):
-    #             # Invalid data value index
-    #             if left_good_idx >= 0:
-    #                 # Hit righthand end in the lat/row
-    #                 right_good_idx = xidx - 1
-    #                 print(f"* row {yidx:5d}: {left_good_idx:5d} {right_good_idx:5d}")
-    #                 row_lons = lons[yidx, left_good_idx:right_good_idx + 1]
-    #                 row_lats = lats[yidx, left_good_idx:right_good_idx + 1]
-    #                 print(f"\trow_lons ({len(row_lons)}): [{np.amin(row_lons):+9.3f} ... {np.amax(row_lons):+9.3f}]")
-    #                 print(f"\trow_lats ({len(row_lats)}): [{np.amin(row_lats):+9.3f} ... {np.amax(row_lats):+9.3f}]")
+    #         ##
+    #         # Scan along the row (by column) looking for a col_span set of lat diffs
+    #         ncols = lats.shape[1]
+    #         min_diff_col = -1
+    #         min_diff = 1e10
+    #         for iidx in range(ncols):
+    #             span_end = iidx + col_span
+    #             if span_end > ncols - 1:
     #                 break
-    #             continue
-    #         if left_good_idx < 0:
-    #             # First valid value in the lat/row on the lefthand side of the array
-    #             left_good_idx = xidx
-    #             # print(f"\t\tSet {left_good_idx = :5d}")
-    #         else:
-    #             # Post First value value in lat/row
-    #             if xidx == nx - 1:
-    #                 # Entire row valid
-    #                 right_good_idx = xidx
-    #                 # print(f"\t\tSet {right_good_idx = :5d}")
-    #                 print(f"+ row {yidx:5d}: {left_good_idx:5d} {right_good_idx:5d}")
-    #                 row_lons = lons[yidx, left_good_idx:right_good_idx + 1]
-    #                 row_lats = lats[yidx, left_good_idx:right_good_idx + 1]
-    #                 print(f"\trow_lons ({len(row_lons)}): [{np.amin(row_lons):+9.3f} ... {np.amax(row_lons):+9.3f}]")
-    #                 print(f"\trow_lats ({len(row_lats)}): [{np.amin(row_lats):+9.3f} ... {np.amax(row_lats):+9.3f}]")
-    #                 continue
-    #             right_good_idx = xidx
-    #             # print(f"\t\tSet ** {right_good_idx = :5d}")
-    #     if left_good_idx < 0:
-    #         # Entire row invalid
-    #         print(f"- row {yidx:5d}:")
-    # os._exit(1)
+    #             test_span_lats = test_lats[:, iidx:span_end]
+    #             test_span_lons = test_lons[:, iidx:span_end]
+    #             lat_diff = np.sum(np.abs(np.subtract(test_euro_lats, test_span_lats)))
+    #             lon_diff = np.sum(np.abs(np.subtract(test_euro_lons, test_span_lons)))
+    #             total_diff = lat_diff + lon_diff
+    #             if total_diff < min_diff:
+    #                 min_diff = total_diff
+    #                 min_diff_col = iidx
+    #             # print(f"\t{iidx:04d}-{span_end}: {total_diff:10.1f} {np.mean(np.abs(np.subtract(test_euro_lats, test_span_lats)))} {np.mean(np.abs(np.subtract(test_euro_lons, test_span_lons)))}")
+    #             # if iidx == 1090:
+    #             #     print(f"\t{iidx:04d}-{span_end}: {total_diff:10.1f} {np.mean(np.abs(np.subtract(test_euro_lons[464, :], test_span_lons[464, :])))}")
+    #             #     print("diff", np.abs(np.subtract(test_euro_lons[464, :], test_span_lons[464, :])))
+    #             #     print(f"{test_euro_lons[464, :] = }")
+    #             #     print(f"{test_span_lons[464, :] = }\n")
+    #         print(f"Min Lat Col {min_diff_col} w/ diff {min_diff}")
+    #         # os._exit(1)
+
+    #         # # row_diff = np.zeros((check_hieght, lats.shape[0]))
+    #         # row_diff = {}
+    #         # for jidx in range(lats.shape[0]):
+    #         #     if jidx < skip_to_bot:
+    #         #         continue
+    #         #     msg = f"\tlats {jidx:04d}:"
+    #         #     tmp = lats[jidx, :]
+    #         #     good_idx = np.nonzero(np.abs(tmp) <= 90.0)[0]
+    #         #     if len(good_idx) == 0:
+    #         #         print(f"{msg} NAN")
+    #         #         continue
+    #         #     else:
+    #         #         print(f"{msg} i_start = {good_idx[0]:04d} {tmp[good_idx[0]]:+10.4f} ... i_end = {good_idx[-1]:04d} {tmp[good_idx[-1]]:+10.4f}")
+    #         #         ##
+    #         #         # Scan along the row (by column) looking for a col_span set of lat diffs
+    #         #         for iidx in range(lats.shape[1]):
+    #         #             test_span = lats[jidx, iidx:iidx + col_span]
+    #         #             raw_span =
+    #         #             # r_diff =
+    #         #             os._exit(1)
+
+    #     #   euro_lons (928, 1530): [-69.2706298828125   ... 69.2706298828125]
+    #     #   euro_lats (928, 1530): [ 26.67105484008789  ... 81.09877014160156]
+    #     #
+    #     #   lons (3712, 3712)    : [-81.12566375732422, ... 81.12566375732422]
+    #     #   lats (3712, 3712)    : [-81.0744857788086,  ... 81.0744857788086]
+
+    #     # return
+    #     # os._exit(1)
+
+    #     # 3712 x 3712
+    #     # 11136 x 5568
+
+    #     # # lats (928, 3712) (1932430,): [26.656396865844727, ... 81.0744857788086]
+    #     # # lats = lats[3712 - euro_nrows:, :]
+
+    #     # # row (jj) starts at S and moves N
+    #     # # col (ii) starts in E and moves W
+    #     # # lons[jj, ii] where jj is row and ii is column
+    #     # # 45W - 30E
+
+    #     # # # jj = 2652 ii = 3146: (lat, lon) (23.81135368347168, -45.049129486083984)
+    #     # # jj = 2652
+    #     # # ii = 3146
+    #     # # print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
+
+    #     # # # jj = 2652 ii =  910: (lat, lon) (23.114727020263672, 30.13174819946289)
+    #     # # jj = 2652
+    #     # # ii = 910
+    #     # # print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
+
+    #     # # jj = 2652 ii =  910: (lat, lon) (23.114727020263672, 30.13174819946289)
+    #     # jj = 2652
+    #     # ii = 3146 - euro_ncols
+    #     # print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
+
+    #     # 3146 - 1530 = 1616
+    #     # # euro_nrows = 928
+    #     # # euro_ncols = 1530
+    #     # # 3146-910 = 2236
+    #     # # 2236 - 1530 = 706
+    #     # os._exit(1)
+
+    #     # dones = 0
+    #     # for jj in range(3712):
+    #     #     for ii in range(3712):
+    #     #         if np.abs(lons[jj, ii]) <= 180.0 and np.abs(lats[jj, ii] <= 90.0):
+    #     #             if lats[jj, ii] >= 26.0 and lons[jj, ii] <= -45:
+    #     #                 print(f"{jj = :4d} {ii = :4d}: (lat, lon) ({lats[jj, ii]}, {lons[jj, ii]})")
+    #     #                 dones += 1
+    #     #     # if dones > 5:
+    #     #     #     os._exit(1)
+
+    #     lats = lats[3712 - euro_nrows:, :]
+    #     lons = lons[3712 - euro_nrows:, :]
+
+    #     # 45W - 30E
+    #     # 3712-1530
+    #     if verbose:
+    #         tmp = lons.flatten()
+    #         tmp = tmp[np.abs(tmp) <= 180.0]
+    #         print(f"\n\tlons {lons.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+    #         tmp = lats.flatten()
+    #         tmp = tmp[np.abs(tmp) <= 90.0]
+    #         print(f"\tlats {lats.shape} {tmp.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+    #         del tmp
+
+    # # ny, nx = lons.shape
+    # # # for yidx in range(53, 60):
+    # # for yidx in range(ny):
+    # #     left_good_idx = -1
+    # #     right_good_idx = -1
+    # #     ## print(f"Checking {yidx = :5d}")
+    # #     for xidx in range(nx):
+    # #         ## print(f"\tChecking {xidx = :5d} {data_vals[yidx, xidx]}")
+    # #         if np.isnan(data_vals[yidx, xidx]):
+    # #             # Invalid data value index
+    # #             if left_good_idx >= 0:
+    # #                 # Hit righthand end in the lat/row
+    # #                 right_good_idx = xidx - 1
+    # #                 print(f"* row {yidx:5d}: {left_good_idx:5d} {right_good_idx:5d}")
+    # #                 row_lons = lons[yidx, left_good_idx:right_good_idx + 1]
+    # #                 row_lats = lats[yidx, left_good_idx:right_good_idx + 1]
+    # #                 print(f"\trow_lons ({len(row_lons)}): [{np.amin(row_lons):+9.3f} ... {np.amax(row_lons):+9.3f}]")
+    # #                 print(f"\trow_lats ({len(row_lats)}): [{np.amin(row_lats):+9.3f} ... {np.amax(row_lats):+9.3f}]")
+    # #                 break
+    # #             continue
+    # #         if left_good_idx < 0:
+    # #             # First valid value in the lat/row on the lefthand side of the array
+    # #             left_good_idx = xidx
+    # #             # print(f"\t\tSet {left_good_idx = :5d}")
+    # #         else:
+    # #             # Post First value value in lat/row
+    # #             if xidx == nx - 1:
+    # #                 # Entire row valid
+    # #                 right_good_idx = xidx
+    # #                 # print(f"\t\tSet {right_good_idx = :5d}")
+    # #                 print(f"+ row {yidx:5d}: {left_good_idx:5d} {right_good_idx:5d}")
+    # #                 row_lons = lons[yidx, left_good_idx:right_good_idx + 1]
+    # #                 row_lats = lats[yidx, left_good_idx:right_good_idx + 1]
+    # #                 print(f"\trow_lons ({len(row_lons)}): [{np.amin(row_lons):+9.3f} ... {np.amax(row_lons):+9.3f}]")
+    # #                 print(f"\trow_lats ({len(row_lats)}): [{np.amin(row_lats):+9.3f} ... {np.amax(row_lats):+9.3f}]")
+    # #                 continue
+    # #             right_good_idx = xidx
+    # #             # print(f"\t\tSet ** {right_good_idx = :5d}")
+    # #     if left_good_idx < 0:
+    # #         # Entire row invalid
+    # #         print(f"- row {yidx:5d}:")
+    # # os._exit(1)
 
     # Find spatial extent of non-missing data
     tmp_vals = data_vals.flatten()
@@ -502,6 +534,7 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
     tmp_lats = lats.flatten()
     good_lons = []
     good_lats = []
+    good_vals = []
     ll_corner = [None, None]
     ur_corner = [None, None]
     for ii, ival in enumerate(tmp_vals):
@@ -512,6 +545,7 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         if np.abs(tmp_lons[ii]) <= 180.0 and np.abs(tmp_lats[ii]) <= 90.0:
             good_lons.append(tmp_lons[ii])
             good_lats.append(tmp_lats[ii])
+            good_vals.append(tmp_vals[ii])
             # if ll_corner[0] is not None:
             #     if tmp_lats[ii] <= ll_corner[0]:
             #         # New Lower Latitude
@@ -537,6 +571,7 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
     if verbose:
         print(f"good_lons ({len(good_lons)}): [{np.amin(good_lons)} ... {np.amax(good_lons)}]")
         print(f"good_lats ({len(good_lats)}): [{np.amin(good_lats)} ... {np.amax(good_lats)}]")
+        print(f"good_vals ({len(good_vals)}): [{np.amin(good_vals)} ... {np.amax(good_vals)}]")
         # print(f"ll_corner: {ll_corner}")
         # print(f"ur_corner: {ur_corner}")
 

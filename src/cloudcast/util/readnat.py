@@ -79,6 +79,14 @@ def readnat(file: str, calibration: str, dataset: Union[str, list], reader: str,
             values.append(scn[ds].values)
 
     ##
+    # Get the brightness temperature data
+    # brightness_temp = scn[dataset].compute()
+    # print(f"{brightness_temp.min() = }")
+    # print(f"{brightness_temp.mean() = }")
+    # print(f"{brightness_temp.median() = }")
+    # print(f"{brightness_temp.max() = }")
+
+    ##
     # Change the datatype of the arrays depending on the present data this can be changed
     #   lons   (11136, 5568)
     #   lats   (11136, 5568)
