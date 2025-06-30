@@ -16,8 +16,8 @@ from pathlib import Path
 # Third-Party Imports
 import numpy as np
 import numpy.typing as npt
-from osgeo import gdal
-from osgeo import osr
+# from osgeo import gdal
+# from osgeo import osr
 import pyresample as pr
 #   conda install -c conda-forge satpy
 from satpy import Scene
@@ -40,13 +40,49 @@ __all__ = ['natread']
 __docformat__ = "Numpydoc"
 # ------------------------------------------------------------------------------
 
+##
+# Type Aliases
+SetOut: TypeAlias = tuple[int, int, int, typing.TypeVar('cartopy.crs'),
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')],
+                     Union[None, pr.geometry.AreaDefinition], Union[None, typing.TypeVar('cartopy.crs')]]
+
 
 ###############################################################################
 # PUBLIC natread()
 # ----------------
-def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.ArrayLike, euro_lats: npt.ArrayLike, fromzip: bool) -> None:
+def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.ArrayLike, euro_lats: npt.ArrayLike, to_ccast:bool, geo_dat: SetOut, fromzip: bool) -> None:
 
     verbose = [False, True][1]
+
+    ##
+    # Unpack setup setup data
+    (MSG_EPSG, MERC_EPSG, LCC_EPSG, geod_crs, ccast_area_def, ccast_crs, ccast_merc_area_def,
+     ccast_merc_crs, ccast_lcc_area_def, ccast_lcc_crs, msg_area_def, msg_crs,
+     msg_merc_area_def, msg_merc_crs, raw_area_def, raw_crs, raw_merc_area_def,
+     raw_merc_crs) = geo_dat
+
+    use_lcc_crs = None
+    use_lcc_area_def = None
+    if to_euro:
+        use_crs = raw_crs
+        use_area_def = raw_area_def
+        use_merc_crs = raw_merc_crs
+        use_merc_area_def = raw_merc_area_def
+    elif to_ccast:
+        use_crs = ccast_crs
+        use_area_def = ccast_area_def
+        use_merc_crs = ccast_merc_crs
+        use_merc_area_def = ccast_merc_area_def
+        use_lcc_crs = ccast_lcc_crs
+        use_lcc_area_def = ccast_lcc_area_def
+
+    if verbose:
+        print(f"\nReading {fvar}")
 
     ##
     # Read the file
@@ -119,6 +155,9 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         print(f"\tcalibration '{use_calibration}' w/ units of {fvar_units}")
     del fvar__
 
+    ## use_calibration = "counts"
+    ## use_calibration = "radiance"
+
     ##
     # Extract wanted data
     """
@@ -156,6 +195,8 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         tmp_len = len(tmp)
         tmp = tmp[~np.isnan(tmp)]
         tmp = tmp[tmp > 0.0]
+        if use_calibration == "reflectance":
+            tmp = tmp[tmp <= 100.0]
         tmp1_len = len(tmp)
         len_frac = 100.0 * (tmp1_len / tmp_len)
         print(f"\tdata_vals {data_vals.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
@@ -163,6 +204,78 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
 
     if fromzip:
         os.remove(fname)
+
+    if to_ccast:
+        dtype = "float32"
+        radius = 16000
+        epsilon = 0.5
+        nodata = -3.4E+38
+
+        ##
+        # Apply a swath definition for our output raster
+        #   <class 'pyresample.geometry.SwathDefinition'>
+        swath_def = pr.geometry.SwathDefinition(lons=lons, lats=lats)
+
+        ##
+        # Resample our data to the area of interest
+        #   data_vals* (768, 768): [0.5235565900802612, ... 13.425487518310547]
+
+        # if use_calibration == "reflectance":
+        #     data_vals = np.nan_to_num(data_vals, nan=0.0)
+
+        ccast_data_vals = pr.kd_tree.resample_nearest(swath_def, data_vals,
+                                                      use_area_def,
+                                                      radius_of_influence=radius, # in meters
+                                                      epsilon=epsilon,
+                                                      fill_value=False)
+        ccast_lons = pr.kd_tree.resample_nearest(swath_def, lons,
+                                                 use_area_def,
+                                                 radius_of_influence=radius, # in meters
+                                                 epsilon=epsilon,
+                                                 fill_value=False)
+        ccast_lats = pr.kd_tree.resample_nearest(swath_def, lats,
+                                                 use_area_def,
+                                                 radius_of_influence=radius, # in meters
+                                                 epsilon=epsilon,
+                                                 fill_value=False)
+
+        if verbose:
+            tmp = ccast_lons.flatten()
+            tmp_len = len(tmp)
+            tmp = tmp[np.abs(tmp) <= 180.0]
+            tmp1_len = len(tmp)
+            len_frac = 100.0 * (tmp1_len / tmp_len)
+            print(f"\n\tccast_lons {ccast_lons.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+
+            tmp = ccast_lats.flatten()
+            tmp_len = len(tmp)
+            tmp = tmp[np.abs(tmp) <= 90.0]
+            tmp1_len = len(tmp)
+            len_frac = 100.0 * (tmp1_len / tmp_len)
+            print(f"\tccast_lats {ccast_lats.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+
+            tmp = ccast_data_vals.flatten()
+            tmp_len = len(tmp)
+            tmp = tmp[~np.isnan(tmp)]
+            tmp = tmp[tmp > 0.0]
+            if use_calibration == "reflectance":
+                tmp = tmp[tmp <= 100.0]
+            tmp1_len = len(tmp)
+            len_frac = 100.0 * (tmp1_len / tmp_len)
+            print(f"\tccast_data_vals {ccast_data_vals.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+
+            print(np.std(tmp))  # 13.81
+
+            tmp = tmp.astype(np.uint16)
+            print(f"\tccast_data_vals {ccast_data_vals.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+            print(np.std(tmp))  # 13.813447
+            # ccast_data_vals (768, 768) 100.00%: [210, ... 292]
+            # 13.83
+
+            del tmp
+
+
+        return
 
 
     if to_euro:
@@ -365,6 +478,8 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
                 tmp_len = len(tmp)
                 tmp = tmp[~np.isnan(tmp)]
                 tmp = tmp[tmp > 0.0]
+                if use_calibration == "reflectance":
+                    tmp = tmp[tmp <= 100.0]
                 tmp1_len = len(tmp)
                 len_frac = 100.0 * (tmp1_len / tmp_len)
                 print(f"\tdata_vals_euro {data_vals_sub.shape} {len_frac:5.2f}%: [{np.amin(tmp)}, ... {np.amax(tmp)}]")

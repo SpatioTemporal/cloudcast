@@ -1,0 +1,51 @@
+Title                           : High Rate SEVIRI Level 1.5 Image Data - MSG - 0 degree
+Version                         : revision 1?
+Publisher                       : European Organisation for the Exploitation of Meteorological Satellites (EUMETSAT) 
+Release Date                    : 2009-03-23, revised 2010-09-21
+DOI                             : EO:EUM:DAT:MSG:HRSEVIRI 
+Description                     : Rectified (level 1.5) Meteosat SEVIRI image data (also Meteosat Second Generation (MSG, Meteosat-8 - Meteosat-9)). 
+                                  The data is transmitted as High Rate transmissions in 12 spectral channels. Level 1.5 image data 
+                                  corresponds to the geolocated and radiometrically pre-processed image data, ready for further 
+                                  processing, e.g. the extraction of meteorological products.
+Processing Level                : Level 1
+Acronyms                        : HRSEVIRI, MSG15
+Data Source                     : https://user.eumetsat.int/catalogue/EO:EUM:DAT:MSG:HRSEVIRI 
+File Name & Size                : MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA.zip          ~185 MB
+                                  MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA/             ~271 MB
+                                    MSG3-SEVI-MSG15-0100-NA-20170102002740.606000000Z-NA.nat        
+                                    EOPMetadata.xml
+                                    manifest.xml
+File Format:                    : Uncompressed zip as MSGN -- Meteosat Second Generation (MSG) Native Archive Format (.nat)
+                                  (GDAL)[https://gdal.org/index.html#] API can read .nat files supports access via C/C++, C#, Java, Go, Python.
+Spatial Coverage                : Full Disk 0 degrees (GeoStationary)
+Temporal Coverage               : 15-minute files from 18 Jan 2004 – Current
+Instrument Channels             : VIS 0.6     Spatial Resolution: 3.0       * Used by CloudCast
+                                  VIS 0.8     Spatial Resolution: 3.0
+                                  IR 1.6      Spatial Resolution: 3.0
+                                  IR 3.9      Spatial Resolution: 3.0       * Used by CloudCast
+                                  WV 6.2      Spatial Resolution: 3.0
+                                  WV 7.3      Spatial Resolution: 3.0
+                                  IR 8.7      Spatial Resolution: 3.0
+                                  IR 9.7      Spatial Resolution: 3.0
+                                  IR 10.8     Spatial Resolution: 3.0       * Used by CloudCast
+                                  IR 12.0     Spatial Resolution: 3.0       * Used by CloudCast
+                                  IR 13.4     Spatial Resolution: 3.0
+                                  HRV         Spatial Resolution: 1.0
+File Size                       : ~185 MB (zipped), ~271 MB uncompressed
+File Type                       : Meteosat Second Generation (MSG) Native Archive Format
+File Type Extension             : .nat
+Compression                     : zip
+Software                        :  
+History                         : Downloaded <DATE>
+Downloaded by                   : <NAME>
+Attribution                     : "[Contains modified] EUMETSAT [Meteosat/Metop] [data/product] [Year of publication or distribution]" or 
+                                  "This service is based on EUMETSAT [Meteosat/Metop] [data/products] [Year of publication or distribution]."
+
+------ Download Script -------
+How do I set up an account on the Earth Observation Portal?
+    In the Earth Observation Portal (https://eoportal.eumetsat.int/userMgmt/login.faces) click on the New User — Create new account link.
+
+Access via a python API:
+    https://user.eumetsat.int/resources/user-guides/eumetsat-data-access-client-eumdac-guide
+
+------ Download Script -------

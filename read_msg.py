@@ -44,11 +44,11 @@ make_tif = [False, True][0]
 
 ##
 # Read the nat file only (not geotif or plots)
-read_nat = [False, True][0]
+read_nat = [False, True][1]
 
 ##
 # Make a figure
-make_fig = [False, True][1]
+make_fig = [False, True][0]
 
 ##
 # Read nat rather than tif
@@ -67,11 +67,11 @@ as_full = [False, True][0]
 
 ##
 # Return the CloudCast european resolution and domain (reprojection, subsetting and interpolation)
-as_euro = [False, True][1]
+as_euro = [False, True][0]
 
 ##
 # Return the CloudCast resolution and domain (reprojection, subsetting and interpolation)
-as_ccast = [False, True][0]
+as_ccast = [False, True][1]
 
 if sum([int(as_full), int(as_euro), int(as_ccast)]) > 1:
     raise Exception("Can only use one of as_full as_euro as_ccast.")
@@ -124,7 +124,7 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 
 ##
 # Just IR_087 IR Window Channel
-# use_dataset = ds_names[ds_names.index("IR_087")]
+use_dataset = ds_names[ds_names.index("IR_087")]
 
 ##
 # Just WV_073 IR Water vapor
@@ -132,7 +132,7 @@ ds_names = ("HRV", "IR_016", "IR_039", "IR_087", "IR_097", "IR_108", "IR_120",
 
 ##
 # Just IR_108 IR Window Channel
-use_dataset = ds_names[ds_names.index("IR_108")]
+# use_dataset = ds_names[ds_names.index("IR_108")]
 
 ##
 # Just IR_120 IR Window Channel
@@ -194,11 +194,6 @@ if as_euro:
 else:
     raw_lons = np.zeros((1,1))
     raw_lats = np.zeros((1,1))
-if read_nat:
-    ##
-    # Read the file
-    natread(fname=FNAME, fvar=use_dataset, reader=reader, to_euro=as_euro, euro_lons=raw_lons, euro_lats=raw_lats, fromzip=zip2nat)
-    os._exit(1)
 
 ##
 # Run MSG setup
@@ -211,6 +206,12 @@ geo_stuff = setup_msg(use_dataset, as_ccast, as_euro, as_merc, as_lcc)
 # for ii, ival in enumerate(tmp):
 #     print(f"\n{labels[ii]}: {ival}")
 # os._exit(1)
+
+if read_nat:
+    ##
+    # Read the file
+    natread(fname=FNAME, fvar=use_dataset, reader=reader, to_euro=as_euro, euro_lons=raw_lons, euro_lats=raw_lats, to_ccast=as_ccast, geo_dat=geo_stuff, fromzip=zip2nat)
+    os._exit(1)
 
 if make_tif:
     ##
@@ -248,6 +249,7 @@ if make_fig:
     #   ds.GetGeoTransform()  = (-855100.436345, 3000.0, 0.0, -2638000.0, 0.0, -3000.0)
     #   ds.GetProjection()    = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
 
+    the_title = f"{use_dataset}"
     if use_nat:
         if zip2nat:
             zpath = Path(FNAME)
@@ -273,6 +275,8 @@ if make_fig:
             print(f"\tcalibration '{use_calibration}' w/ units of {fvar_units}")
         del fvar__
 
+        the_title = f"{use_dataset} as {use_calibration}"
+
         # calibration = "radiance"
         # dtype = "float32"
         # radius = 16000
@@ -286,7 +290,42 @@ if make_fig:
         data_vals = scn[use_dataset].values
         if as_euro:
             data_vals = data_vals[-928:, 1092:2622]
+        elif as_ccast:
+            if as_merc:
+                use_crs = ccast_merc_crs
+                use_area_def = ccast_merc_area_def
+            elif as_lcc:
+                use_crs = ccast_lcc_crs
+                use_area_def = ccast_lcc_area_def
+            else:
+                use_crs = ccast_crs
+                use_area_def = ccast_area_def
+            dtype = "float32"
+            radius = 16000
+            epsilon = 0.5
+            nodata = -3.4E+38
 
+            lons, lats = scn[use_dataset].area.get_lonlats()
+
+            ##
+            # Apply a swath definition for our output raster
+            #   <class 'pyresample.geometry.SwathDefinition'>
+            swath_def = pr.geometry.SwathDefinition(lons=lons, lats=lats)
+
+            ##
+            # Resample our data to the area of interest
+            #   data_vals* (768, 768): [0.5235565900802612, ... 13.425487518310547]
+            data_vals = pr.kd_tree.resample_nearest(swath_def, data_vals,
+                                                    use_area_def,
+                                                    radius_of_influence=radius, # in meters
+                                                    epsilon=epsilon,
+                                                    fill_value=False)
+
+            # data_vals = data_vals.astype(np.uint16)
+            # print(data_vals)
+            # the_title = f"{use_dataset} as {use_calibration} and int"
+
+            # print(data_vals)
         if zip2nat:
             os.remove(TNAME)
     else:
@@ -381,25 +420,29 @@ if make_fig:
         #   CCAST Mercator
         #       values: [0.5609534978866577, ... 14.248218536376953]
         the_alpha = 1.0
-        if use_dataset == "HRV":
-            # bounds = np.linspace(0.0, 15.0, num=16, endpoint=True)
-            bounds = np.linspace(0.0, 25.0, num=16, endpoint=True)
-            the_min = 0.0
-            the_max = 25.0
-        else:
-            bounds = np.linspace(0.0, 4.0, num=16, endpoint=True)
-            the_min = 0.0
-            the_max = 4.0
+        # if use_dataset == "HRV":
+        #     # bounds = np.linspace(0.0, 15.0, num=16, endpoint=True)
+        #     bounds = np.linspace(0.0, 25.0, num=16, endpoint=True)
+        #     the_min = 0.0
+        #     the_max = 25.0
+        # else:
+        #     bounds = np.linspace(0.0, 4.0, num=16, endpoint=True)
+        #     the_min = 0.0
+        #     the_max = 4.0
 
-            bounds = np.linspace(0.0, 60.0, num=16, endpoint=True)
-            the_min = 0.0
-            the_max = 60.0
+        #     bounds = np.linspace(0.0, 60.0, num=16, endpoint=True)
+        #     the_min = 0.0
+        #     the_max = 60.0
 
-        if as_region:
-            bounds = np.linspace(0.0, 1.0, num=2, endpoint=True)
-            the_min = 0.0
-            the_max = 1.0
-            the_alpha = 0.25
+        # if as_region:
+        #     bounds = np.linspace(0.0, 1.0, num=2, endpoint=True)
+        #     the_min = 0.0
+        #     the_max = 1.0
+        #     the_alpha = 0.25
+        the_min = np.round(np.amin(data_vals), decimals=0)
+        the_max = np.round(np.amax(data_vals), decimals=0)
+        bounds = np.linspace(the_min, the_max, num=16, endpoint=True)
+
         if as_lcc:
             a_image = plt.imshow(data_vals, cmap=freq_map_cmap, transform=use_crs, extent=use_extent, origin='upper', vmin=the_min, vmax=the_max, alpha=the_alpha)
             ax.set_extent(use_extent, crs=use_crs)
@@ -496,6 +539,8 @@ if make_fig:
         a_image = plt.imshow(data_vals, cmap=freq_map_cmap, transform=use_crs, extent=use_extent, origin='upper', vmin=the_min, vmax=the_max, alpha=the_alpha)
     ax.add_feature(cfeature.COASTLINE, alpha=1)
     ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False, linewidth=2, color='black', alpha=0.5, linestyle='--')
+
+    plt.title(the_title)
 
     if not as_region:
         ##

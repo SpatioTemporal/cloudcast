@@ -111,20 +111,6 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
         use_merc_area_def = ccast_merc_area_def
         use_lcc_crs = ccast_lcc_crs
         use_lcc_area_def = ccast_lcc_area_def
-
-    # if fvar in ['VIS006', "HRV"]:
-    #     calibration = "reflectance"
-    # else:
-    #     calibration = "brightness_temperature"
-    calibration = "radiance"
-    """
-
-    IR_039 calibration = "radiance"
-        data_vals (928, 1530): [0.003658667206764221, ... 1.4963948726654053]
-
-    IR_039 calibration = "", which I think defaults to "brightness_temperature"
-        data_vals (928, 1530): [204.75961303710938, ... 310.7130126953125]
-    """
     dtype = "float32"
     radius = 16000
     epsilon = 0.5
@@ -142,8 +128,32 @@ def nat2tif(fname: str, fvar: str, reader: str, outdir: str, label: str, atag: s
         raise Exception(f"Specified variable {fvar} is not available.")
 
     ##
+    # Get calibration
+    # if fvar in ['VIS006', "HRV"]:
+    #     calibration = "reflectance"
+    # else:
+    #     calibration = "brightness_temperature"
+    # calibration = "radiance"
+    """
+    IR_039 calibration = "radiance"
+        data_vals (928, 1530): [0.003658667206764221, ... 1.4963948726654053]
+
+    IR_039 calibration = "", which I think defaults to "brightness_temperature"
+        data_vals (928, 1530): [204.75961303710938, ... 310.7130126953125]
+    """
+    scn.load([fvar])
+    fvar__ = scn[fvar]
+    fvar__atts = fvar__.attrs
+    fvar_units = fvar__atts['units']
+    fvar_name = fvar__atts['standard_name']
+    use_calibration = fvar__atts['calibration']
+    if verbose:
+        print(f"\tcalibration '{use_calibration}' w/ units of {fvar_units}")
+    del fvar__
+
+    ##
     # Load the data, different calibration can be chosen
-    scn.load([fvar], calibration=calibration)
+    scn.load([fvar], calibration=use_calibration)
     # scn.load([fvar])
 
     ##
