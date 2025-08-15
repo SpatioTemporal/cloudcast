@@ -12,6 +12,7 @@ import copy
 import typing
 from typing import Optional, Union, TypeAlias
 from pathlib import Path
+import pickle
 
 # Third-Party Imports
 import numpy as np
@@ -80,7 +81,6 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         use_merc_area_def = ccast_merc_area_def
         use_lcc_crs = ccast_lcc_crs
         use_lcc_area_def = ccast_lcc_area_def
-
     if verbose:
         print(f"\nReading {fvar}")
 
@@ -138,8 +138,8 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
         zpath = Path(fname)
         zfile = f"{zpath.parent}.zip"
         ffile = f"{zpath.name}"
-        with ZipFile(zfile, 'r') as zip:
-            fname = zip.extract(ffile)
+        with ZipFile(zfile, 'r') as zipper:
+            fname = zipper.extract(ffile)
     scn = Scene(filenames = {reader:[fname]})
     # print(scn.values())
 
@@ -151,6 +151,15 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
     fvar_units = fvar__atts['units']
     fvar_name = fvar__atts['standard_name']
     use_calibration = fvar__atts['calibration']
+
+    # print(fvar__atts['orbital_parameters'])
+    print(fvar__atts.keys())
+
+    # print(f"{fvar__atts['platform_name'] = }")
+    # print(f"{fvar__atts['sensor'] = }")
+    # print(f"{fvar__atts['time_parameters'] = }")
+    # os._exit(0)
+
     if verbose:
         print(f"\tcalibration '{use_calibration}' w/ units of {fvar_units}")
     del fvar__
@@ -239,6 +248,12 @@ def natread(fname: str, fvar: str, reader: str, to_euro: bool, euro_lons: npt.Ar
                                                  epsilon=epsilon,
                                                  fill_value=False)
 
+        ##
+        # Save to File for working with ERA-5
+        lonlatfile = "/Users/mbauer/tmp/CloudCast/ccast_lonlat.npy"
+        with open(lonlatfile, 'wb') as f:
+            np.save(f, ccast_lons)
+            np.save(f, ccast_lats)
         if verbose:
             tmp = ccast_lons.flatten()
             tmp_len = len(tmp)

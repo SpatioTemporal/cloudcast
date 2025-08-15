@@ -19,9 +19,9 @@ from osgeo import osr
 # from satpy import Scene
 import cartopy
 import cartopy.crs as ccrs
+import pprint
 
 # Local Imports
-from cloudcast.util.readnat import readnat
 
 ##
 # List of Public objects from this module.
@@ -76,23 +76,203 @@ band_ids = band_ids_nielsen
 band_def = band_def_nielsen
 
 filename = "/Users/mbauer/tmp/CloudCast/msg/20170601001240.nat"
+# filename = "/Users/mbauer/tmp/CloudCast/msg/MSG3-SEVI-MSG15-0100-NA-20170601001240.835000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20170601001240.835000000Z-NA.nat"
 
-# <osgeo.gdal.Dataset; proxy of <Swig Object of type 'GDALDatasetShadow *' at 0x12f4c7210> >
-# ['AbortSQL', 'AddBand', 'AddFieldDomain', 'AddRelationship', 'AdviseRead', 'BeginAsyncReader', 'BuildOverviews', 'ClearStatistics', 'Close',
-# 'CommitTransaction', 'CopyLayer', 'CreateLayer', 'CreateLayerFromGeomFieldDefn', 'CreateMaskBand', 'DeleteFieldDomain', 'DeleteLayer', 'DeleteRelationship',
-# 'Destroy', 'EndAsyncReader', 'ExecuteSQL', 'FlushCache', 'GetDescription', 'GetDriver', 'GetFieldDomain', 'GetFieldDomainNames', 'GetFileList', 'GetGCPCount',
-# 'GetGCPProjection', 'GetGCPSpatialRef', 'GetGCPs', 'GetGeoTransform', 'GetLayer', 'GetLayerByIndex', 'GetLayerByName', 'GetLayerCount', 'GetMetadata',
-# 'GetMetadataDomainList', 'GetMetadataItem', 'GetMetadata_Dict', 'GetMetadata_List', 'GetName', 'GetNextFeature', 'GetProjection', 'GetProjectionRef',
-# 'GetRasterBand', 'GetRefCount', 'GetRelationship', 'GetRelationshipNames', 'GetRootGroup', 'GetSpatialRef', 'GetStyleTable', 'GetSubDatasets',
-# 'GetSummaryRefCount', 'GetThreadSafeDataset', 'GetTiledVirtualMem', 'GetTiledVirtualMemArray', 'GetVirtualMem', 'GetVirtualMemArray', 'IsLayerPrivate',
-# 'IsThreadSafe', 'RasterCount', 'RasterXSize', 'RasterYSize', 'ReadAsArray', 'ReadRaster', 'ReadRaster1', 'Release', 'ReleaseResultSet', 'ResetReading',
-# 'RollbackTransaction', 'SetDescription', 'SetGCPs', 'SetGeoTransform', 'SetMetadata', 'SetMetadataItem', 'SetProjection', 'SetSpatialRef', 'SetStyleTable',
-# 'StartTransaction', 'SyncToDisk', 'TestCapability', 'UpdateFieldDomain', 'UpdateRelationship', 'WriteArray', 'WriteRaster',
-dataset = gdal.Open(filename)
+gdal.UseExceptions()
+
+##
+# Info Dump
+# with gdal.Open(filename) as ds:
+#     info = gdal.Info(ds, format='json')
+#     del info["stac"]  # to avoid cluttering below output
+#     pprint.pprint(info, indent=2, width=100)
+r"""
+    { 'bands': [ { 'band': 1,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 01',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 2,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 02',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 3,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 03',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 4,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 04',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 5,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 05',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 6,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 06',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 7,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 07',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 8,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 08',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 9,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 09',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 10,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 10',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'},
+                 { 'band': 11,
+                   'block': [3712, 1],
+                   'colorInterpretation': 'Undefined',
+                   'description': 'band 11',
+                   'max': 1023.0,
+                   'metadata': {},
+                   'min': 1.0,
+                   'noDataValue': 0.0,
+                   'type': 'UInt16'}],
+      'coordinateSystem': { 'dataAxisToSRSAxisMapping': [1, 2],
+                            'wkt': 'PROJCRS["Geostationary projection (MSG)",\n'
+                                   '    BASEGEOGCRS["MSG Ellipsoid",\n'
+                                   '        DATUM["MSG_DATUM",\n'
+                                   '            ELLIPSOID["MSG_SPHEROID",6378137,298.257024882281,\n'
+                                   '                LENGTHUNIT["metre",1,\n'
+                                   '                    ID["EPSG",9001]]]],\n'
+                                   '        PRIMEM["Greenwich",0,\n'
+                                   '            ANGLEUNIT["degree",0.0174532925199433,\n'
+                                   '                ID["EPSG",9122]]]],\n'
+                                   '    CONVERSION["Geostationary Satellite (Sweep Y)",\n'
+                                   '        METHOD["Geostationary Satellite (Sweep Y)"],\n'
+                                   '        PARAMETER["Longitude of natural origin",0,\n'
+                                   '            ANGLEUNIT["degree",0.0174532925199433],\n'
+                                   '            ID["EPSG",8802]],\n'
+                                   '        PARAMETER["Satellite Height",35785863,\n'
+                                   '            LENGTHUNIT["metre",1,\n'
+                                   '                ID["EPSG",9001]]],\n'
+                                   '        PARAMETER["False easting",0,\n'
+                                   '            LENGTHUNIT["metre",1],\n'
+                                   '            ID["EPSG",8806]],\n'
+                                   '        PARAMETER["False northing",0,\n'
+                                   '            LENGTHUNIT["metre",1],\n'
+                                   '            ID["EPSG",8807]]],\n'
+                                   '    CS[Cartesian,2],\n'
+                                   '        AXIS["(E)",east,\n'
+                                   '            ORDER[1],\n'
+                                   '            LENGTHUNIT["metre",1,\n'
+                                   '                ID["EPSG",9001]]],\n'
+                                   '        AXIS["(N)",north,\n'
+                                   '            ORDER[2],\n'
+                                   '            LENGTHUNIT["metre",1,\n'
+                                   '                ID["EPSG",9001]]]]'},
+      'cornerCoordinates': { 'center': [0.0, 1500.202],
+                             'lowerLeft': [-5568748.276, -5567248.074],
+                             'lowerRight': [5568748.276, -5567248.074],
+                             'upperLeft': [-5568748.276, 5570248.477],
+                             'upperRight': [5568748.276, 5570248.477]},
+      'description': '/Users/mbauer/tmp/CloudCast/msg/20170601001240.nat',
+      'driverLongName': 'EUMETSAT Archive native (.nat)',
+      'driverShortName': 'MSGN',
+      'files': ['/Users/mbauer/tmp/CloudCast/msg/20170601001240.nat'],
+      'geoTransform': [ -5568748.275756836,
+                        3000.4031658172607,
+                        0.0,
+                        5570248.477339745,
+                        0.0,
+                        -3000.4031658172607],
+      'metadata': { '': { 'Date/Time': '20170601/00:12',
+                          'Origin': '1 1',
+                          'Radiometric parameters format': 'offset slope',
+                          'ch01_cal': '-1.065267613158e+00 2.088760025799e-02',
+                          'ch02_cal': '-1.421905456111e+00 2.788049913943e-02',
+                          'ch03_cal': '-1.202993122861e+00 2.358810044825e-02',
+                          'ch04_cal': '-1.865920103496e-01 3.658666869601e-03',
+                          'ch05_cal': '-4.242236706827e-01 8.318111189856e-03',
+                          'ch06_cal': '-1.969720376950e+00 3.862196817550e-02',
+                          'ch07_cal': '-6.463960252982e+00 1.267443186859e-01',
+                          'ch08_cal': '-5.302006445576e+00 1.039609106976e-01',
+                          'ch09_cal': '-1.045681948659e+01 2.050356762077e-01',
+                          'ch10_cal': '-1.133786848073e+01 2.223111466809e-01',
+                          'ch11_cal': '-8.037951740768e+00 1.576068968778e-01'}},
+      'size': [3712, 3712],
+      'wgs84Extent': {'coordinates': [[]], 'type': 'Polygon'}}
+"""
+
+"""From https://svn.osgeo.org/gdal/tags/1.7.0/gdal/frmts/msgn/frmt_msgn.html
+    MSGN -- Meteosat Second Generation (MSG) Native Archive Format (.nat)
+
+    GDAL supports reading only of MSG native files. These files may have anything from 1 to 12 bands, all at 10-bit resolution.
+
+    Includes support for the 12th band (HRV - High Resolution Visible).
+    This is implemented as a subset, i.e., it is accessed by prefixing the filename with the tag "HRV:".
+
+    Similarly, it is possible to obtain floating point radiance values in stead of the usual 10-bit digital numbers (DNs).
+    This subset is accessed by prefixing the filename with the tag "RAD:".
+
+    Georeferencing is currently supported, but the results may not be acceptable (accurate enough), depending on your requirements.
+    The current workaround is to implement the CGMS Geostationary projection directly, using the code available from EUMETSAT.
+"""
+
+
+dataset = gdal.Open(f"RAD:{filename}")
+
 print(f"\nReading: {dataset.GetDescription()}")
-# print(f"\tDriver: {dataset.GetDriver()}")
+print(f"\tRasterCount: {dataset.RasterCount}")
 # print(f"\tGetMetadata: {dataset.GetMetadata()}")
-
 
 upper_left_xy = [-855100.436345, -4942000.0]
 lower_right_xy = [1448899.563655, -2638000.0]
@@ -101,11 +281,17 @@ img = []
 for bidx, band_id in enumerate(band_ids):
     print(f"\tReading Band {band_id}: {band_def[bidx]}")
     band = dataset.GetRasterBand(band_id)
+    # print(band.GetDataset().GetDriver())
+    # print(band.GetDataset().GetLayerCount())
+
+    # print(band.GetHistogram())
+    # break
     geotransform = dataset.GetGeoTransform()
 
     x_min, y_max = get_pixel_coords(geotransform, upper_left_xy[0], upper_left_xy[1])
     x_max, y_min = get_pixel_coords(geotransform, lower_right_xy[0], lower_right_xy[1])
-    # print(f"\t{x_min = }, {y_max = }, {x_max = }, {y_min = }")
+    print(f"\t{x_min = }, {y_max = }, {x_max = }, {y_min = }")
+    break
     # data_subset = band.ReadAsArray(x_min, y_min, x_max - x_min, y_max - y_min).tolist()
     #   ndarray (768, 768)
     data_subset = band.ReadAsArray(x_min, y_min, x_max - x_min, y_max - y_min)

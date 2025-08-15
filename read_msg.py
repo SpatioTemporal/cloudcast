@@ -22,6 +22,7 @@ import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 from satpy import Scene
 from zipfile import ZipFile
+import netCDF4
 
 # STARE Imports
 
@@ -29,6 +30,9 @@ from zipfile import ZipFile
 from cloudcast.cfg.setup_msg import setup_msg
 from cloudcast.util.natread import natread
 from cloudcast.util.nat2tif import nat2tif
+from cloudcast.util.calculate_solar_angles import calculate_solar_angles
+from cloudcast.cfg.setup_era5 import setup_era5
+from cloudcast.util.read_era5 import read_era5
 
 ##
 # Markup Language Specification (see NumpyDoc Python Style Guide https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -44,7 +48,7 @@ make_tif = [False, True][0]
 
 ##
 # Read the nat file only (not geotif or plots)
-read_nat = [False, True][1]
+read_nat = [False, True][0]
 
 ##
 # Make a figure
@@ -52,7 +56,7 @@ make_fig = [False, True][0]
 
 ##
 # Read nat rather than tif
-use_nat = [False, True][1]
+use_nat = [False, True][0]
 
 ##
 # Read .nat from .zip (use with use_nat and read_nat)
@@ -207,6 +211,102 @@ geo_stuff = setup_msg(use_dataset, as_ccast, as_euro, as_merc, as_lcc)
 #     print(f"\n{labels[ii]}: {ival}")
 # os._exit(1)
 
+##
+# Interpolate ERA-5 Temperature Fields to match MSG
+# kimkim
+mod_t_files = [False, True][1]
+t_levs = ["T850", "T700", "T500", "T250"]
+if mod_t_files:
+    t_src_dir = "/Volumes/saved4/ERA5/"
+    t_years = [2017, 2018]
+
+    ##
+    # Run ERA5 setup
+    do_dir = f"{t_src_dir}{t_years[0]:4d}/{t_levs[0]}/"
+    do_file = sorted([f"{do_dir}{_}" for _ in os.listdir(do_dir) if _.endswith('.nc')])[0]
+    setup_era5(do_file)
+
+    #
+    os._exit(1)
+
+    for do_lev in t_levs:
+        for do_yr in t_years:
+            r"""
+                ERA-5 Latitudes  161: [ +70.000, ...  +30.000]
+                ERA-5 Longitudes 241: [ -20.000, ...  +40.000]
+
+                Grid Spacing 0.25 x 0.25 deg
+                             ~30 x 30 km
+
+                Grid Centers
+                    (70, -20)----------------(70, 40)
+                    |                               |
+                    |                               |
+                    |                               |
+                    |                               |
+                    (30, -20)----------------(30, 40)
+
+                Grid Edges
+                    (70.125, -20.125)------+------(70.125, -19.875)-----------------(70.125, 39.875)------+------(70.125, 40.125)
+                                        (70, -20)                                                      (70, 40)
+                    (69.875, -20.125)------+------(69.875, -19.875)                 (69.875, 39.875)------+------(69.875, 40.125)
+                    |                                                                                                           |
+                    |                                                                                                           |
+                    |                                                                                                           |
+                    |                                                                                                           |
+                    |                                                                                                           |
+                    (30.125, -20.125)------+------(30.125, -19.875)                 (30.125, 39.875)------+------(30.125, 40.125)
+                                        (30, -20)                                                      (30, 40)
+                    (29.875, -20.125)------+------(29.875, -19.875)-----------------(29.875, 39.875)------+------(29.875, 40.125)
+
+                For interpolation we will project the data to put it in a linear Cartesian framework.
+
+                2017 ERA-5 850 hPa Temperature (8760, 161, 241): min  247.143, mean  277.832, max  309.442 K
+
+            """
+            do_dir = f"{t_src_dir}{do_yr:4d}/{do_lev}/"
+            do_file = sorted([f"{do_dir}{_}" for _ in os.listdir(do_dir) if _.endswith('.nc')])[0]
+            print(f"Reading {do_file}")
+            ncfile = netCDF4.Dataset(do_file, mode='r', format='NETCDF4_CLASSIC')
+
+            era5_lats = ncfile.variables["latitude"][:]
+            era5_lons = ncfile.variables["longitude"][:]
+            nlats = len(era5_lats)
+            nlons = len(era5_lons)
+            dlat = dlon = 0.25
+            ddlat = ddlon = 0.25 * 0.5
+
+            era5_lat_edges = dict([(round(float(i) + ddlat, 3), 1) for i in era5_lats])
+            era5_lat_edges.update([(round(float(i) - ddlat, 3), 1) for i in era5_lats])
+            era5_lat_edges = sorted(list(era5_lat_edges.keys()), reverse=True)
+
+            era5_lon_edges = dict([(float(i) + ddlon, 1) for i in era5_lons])
+            era5_lon_edges.update([(float(i) - ddlon, 1) for i in era5_lons])
+            era5_lon_edges = sorted(list(era5_lon_edges.keys()))
+
+            era5_temp = np.squeeze(ncfile.variables["t"][:], axis=1)
+            tsteps = era5_temp.shape[0]
+            print(f"\tERA-5 Latitudes                           ({nlats}): [{era5_lats[0]:+8.3f}, ... {era5_lats[-1]:+8.3f}]")
+            print(f"\tERA-5 Longitudes                          ({len(era5_lons)}): [{era5_lons[0]:+8.3f}, ... {era5_lons[-1]:+8.3f}]")
+            print(f"\t{do_yr} ERA-5 {do_lev[1:]} hPa Temperature {era5_temp.shape}: min {np.amin(era5_temp):8.3f}, mean {np.mean(era5_temp):8.3f}, max {np.amax(era5_temp):8.3f} K")
+            print(f"\tTime Steps                                     : {tsteps}")
+
+            ##
+            # Loop over time
+            # for tidx in range(tsteps):
+                
+
+            break
+        break
+
+    # zpath = Path(fname)
+    # zfile = f"{zpath.parent}.zip"
+    # ffile = f"{zpath.name}"
+
+    # read_era5
+    # os._exit(1)
+
+
 if read_nat:
     ##
     # Read the file
@@ -255,8 +355,8 @@ if make_fig:
             zpath = Path(FNAME)
             zfile = f"{zpath.parent}.zip"
             ffile = f"{zpath.name}"
-            with ZipFile(zfile, 'r') as zip:
-                TNAME = zip.extract(ffile)
+            with ZipFile(zfile, 'r') as zipper:
+                TNAME = zipper.extract(ffile)
         ##
         # Open the file w/ satpy, which uses Xarray
         #   <class 'satpy.scene.Scene'>
@@ -305,7 +405,82 @@ if make_fig:
             epsilon = 0.5
             nodata = -3.4E+38
 
+            #   use_crs.bounds = (-855100.436345, 1448899.563655, -4942000.0, -2638000.0)
+            # print(f"{use_crs.bounds = }")
+
+            r"""
+            from setup_msg():
+                MSG_HEIGHT = 3712
+                MSG_WIDTH = 3712
+                lower_left_xy  = [-75.26545715332031, -78.95874786376953]
+                upper_right_xy = [75.56462097167969, 78.29975891113281]
+
+            """
+            #   lons (3712, 3712): -81.12548663687087 ... 81.12472104087496
+            #   lats (3712, 3712): -81.07327794830798 ... 81.07426055288249
             lons, lats = scn[use_dataset].area.get_lonlats()
+            print(f"lons {lons.shape}: {np.amin(lons)} ... {np.amax(lons[np.isfinite(lons)])}")
+            print(f"lats {lats.shape}: {np.amin(lats)} ... {np.amax(lats[np.isfinite(lats)])}")
+
+            first_lon = 0
+            max_width = [0, 0]
+            row_start = -1
+            row_end = -1
+            for jj in range(3712):
+                print(f"{jj = :3d}: {lats[0, jj]}")
+                col_cnt = 0
+                col_hit = 0
+                for ii in range(3712):
+                    # if np.isfinite(lons[jj, ii]):
+                    #     # print(f"\n{jj = }, {ii = }: {lons[jj, ii] = }")
+                    #     col_cnt += 1
+                    #     col_hit = 1
+                    #     if row_start == -1:
+                    #         row_start = jj
+                    if np.isfinite(lons[ii, jj]):
+                        # print(f"\t{jj = :3d}, {ii = :3d}: {float(lons[ii, jj])}")
+                        col_cnt += 1
+                        col_hit = 1
+                        if row_start == -1:
+                            row_start = jj
+                if not col_hit and row_end == -1 and row_start != -1:
+                    row_end = jj
+                if col_cnt > max_width[1]:
+                    max_width[0] = f"{jj = :3d}, {ii = :3d}"
+                    max_width[1] = col_cnt
+                print(f"\t{col_cnt = }")
+
+                # if first_lon:
+                #     break
+            print(f"\n{row_start = }, {row_end = }")
+            print(f"{max_width = }")
+            print("Done")
+            os._exit(1)
+            """
+            [jj, ii]
+                row_start = 51, row_end = 3661              3712-3661=51
+                max_width = ['jj = 1807, ii = 3711', 3622]
+            [ii, jj]
+                row_start = 45, row_end = 3667              3712-3667=45
+                max_width = ['jj = 1808, ii = 3711', 3610]
+            """
+            print(f"{lons[0, 0] = }")
+            print(f"{lons[-1, 0] = }")
+            print(f"{lons[0, -1] = }")
+            print(f"{lons[-1, -1] = }")
+            print()
+            print(f"{lats[0, 0] = }")
+            print(f"{lats[-1, 0] = }")
+            print(f"{lats[0, -1] = }")
+            print(f"{lats[-1, -1] = }")
+
+            os._exit(1)
+
+            #   xvals (3712, 3712): -5567248.017211914 ... 5567247.798461914
+            #   yvals (3712, 3712): -5567247.798461914 ... 5567248.017211914
+            xvals, yvals = scn[use_dataset].area.get_proj_coords()
+            print(f"xvals {xvals.shape}: {np.amin(xvals)} ... {np.amax(xvals)}")
+            print(f"yvals {yvals.shape}: {np.amin(yvals)} ... {np.amax(yvals)}")
 
             ##
             # Apply a swath definition for our output raster
@@ -314,12 +489,175 @@ if make_fig:
 
             ##
             # Resample our data to the area of interest
-            #   data_vals* (768, 768): [0.5235565900802612, ... 13.425487518310547]
+            """
+            data_vals  (768, 768): [211.08590698242188, ... 288.95416259765625]
+
+            from setup_msg():
+                ccast_area_def.corners = [
+                    (-12.920934886492649, 62.403066090517555), UL
+                    (33.73865749382469,   60.15059617915855),  UR
+                    (21.32880156090482,   40.92817004367345),  LR
+                    (-4.802566482888071,  42.068097533886025)] LL
+
+                ccast_area_def.area_extent  (-855100.436345, -4942000.0, 1448899.563655, -2638000.0)
+                ccast_crs.bounds      (-855100.436345, 1448899.563655, -4942000.0, -2638000.0)
+
+                lower_left_xy  = [-855100.436345, -4942000.0] => (-4.816534709314307, 42.053336570266744)
+                upper_right_xy = [1448899.563655, -2638000.0] => (33.77742545811928,  60.15622631725923)
+
+            # Seems good
+            ccast_lons (768, 768): [-12.939207254994848, ... 33.70159752849037]
+            ccast_lats (768, 768): [40.93204238308001, ... 63.7329345658077]
+
+            # Not quite the same as setup_msg()
+            ccast_x (768, 768)   : [-604581.3292236328, ... 1666723.7994384766]
+            ccast_y (768, 768)   : [3929027.9376220703, ... 5144191.18347168]
+
+
+            """
             data_vals = pr.kd_tree.resample_nearest(swath_def, data_vals,
                                                     use_area_def,
                                                     radius_of_influence=radius, # in meters
                                                     epsilon=epsilon,
                                                     fill_value=False)
+
+            tmp = data_vals.flatten()
+            tmp = tmp[~np.isnan(tmp)]
+            print(f"data_vals {data_vals.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+            del tmp
+
+            ccast_lons = pr.kd_tree.resample_nearest(swath_def, lons,
+                                                     use_area_def,
+                                                     radius_of_influence=radius, # in meters
+                                                     epsilon=epsilon,
+                                                     fill_value=False)
+            ccast_lats = pr.kd_tree.resample_nearest(swath_def, lats,
+                                                     use_area_def,
+                                                     radius_of_influence=radius, # in meters
+                                                     epsilon=epsilon,
+                                                     fill_value=False)
+            tmp = ccast_lons.flatten()
+            print(f"ccast_lons {ccast_lons.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+
+            tmp = ccast_lats.flatten()
+            print(f"ccast_lats {ccast_lats.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+
+            ccast_x = pr.kd_tree.resample_nearest(swath_def, xvals,
+                                                     use_area_def,
+                                                     radius_of_influence=radius, # in meters
+                                                     epsilon=epsilon,
+                                                     fill_value=False)
+            ccast_y = pr.kd_tree.resample_nearest(swath_def, yvals,
+                                                     use_area_def,
+                                                     radius_of_influence=radius, # in meters
+                                                     epsilon=epsilon,
+                                                     fill_value=False)
+            tmp = ccast_x.flatten()
+            print(f"ccast_x {ccast_x.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+            tmp = ccast_y.flatten()
+            print(f"ccast_y {ccast_y.shape}: [{np.amin(tmp)}, ... {np.amax(tmp)}]")
+
+            ##
+            # Define some metadata
+            """
+            CCAST_HEIGHT = 768
+            CCAST_WIDTH = 768
+            lower_left_xy = [-855100.436345, -4942000.0]
+            upper_right_xy = [1448899.563655, -2638000.0]
+
+            ccast_x (768, 768)   : [-604581.3292236328, ... 1666723.7994384766]
+            ccast_y (768, 768)   : [3929027.9376220703, ... 5144191.18347168]
+
+            pixelWidth : 3000.0
+            pixelHeight: -3000.0
+            originX    : -855100.436345
+            originY    : -2638000.0
+            """
+            cols = data_vals.shape[1]
+            rows = data_vals.shape[0]
+            pixelWidth = (use_area_def.area_extent[2] - use_area_def.area_extent[0]) / cols
+            pixelHeight = (use_area_def.area_extent[1] - use_area_def.area_extent[3]) / rows
+            originX = use_area_def.area_extent[0]
+            originY = use_area_def.area_extent[3]
+            print(f"pixelWidth : {pixelWidth}")
+            print(f"pixelHeight: {pixelHeight}")
+            print(f"originX    : {originX}")
+            print(f"originY    : {originY}")
+
+
+            # used_dtype = [int, float][1]
+            # ccast_x = np.zeros((768, 768), dtype=used_dtype)
+            # ccast_y = np.zeros((768, 768), dtype=used_dtype)
+            # for jj in range(768):
+            #     for ii in range(768):
+            #         # [jj, ii]
+            #         # newx, newy = scn[use_dataset].area.get_array_indices_from_lonlat(ccast_lons[jj, ii], ccast_lats[jj, ii])
+            #         # Matches ccast_x, ccast_y above
+            #         newx, newy = scn[use_dataset].area.get_projection_coordinates_from_lonlat(ccast_lons[jj, ii], ccast_lats[jj, ii])
+            #         ccast_x[jj, ii] = newx
+            #         ccast_y[jj, ii] = newy
+
+            #         #  [ii, jj]
+            #         # newx, newy = scn[use_dataset].area.get_array_indices_from_lonlat(ccast_lons[ii, jj], ccast_lats[ii, jj])
+            #         # # Matches ccast_x, ccast_y above
+            #         # newx, newy = scn[use_dataset].area.get_projection_coordinates_from_lonlat(ccast_lons[ii, jj], ccast_lats[ii, jj])
+            #         # ccast_x[ii, jj] = newx
+            #         # ccast_y[ii, jj] = newy
+
+            # # [jj, ii]
+            # lower_left_i = ccast_x[0, 0]
+            # lower_left_j = ccast_y[0, 0]
+            # lower_right_i = ccast_x[0, -1]
+            # lower_right_j = ccast_y[0, -1]
+            # upper_left_i = ccast_x[-1, 0]
+            # upper_left_j = ccast_y[-1, 0]
+            # upper_right_i = ccast_x[-1, -1]
+            # upper_right_j = ccast_y[-1, -1]
+
+            # # # [ii, jj]
+            # # lower_left_i = ccast_x[0, 0]
+            # # lower_left_j = ccast_y[0, 0]
+            # # lower_right_i = ccast_x[-1, 0]
+            # # lower_right_j = ccast_y[-1, 0]
+            # # upper_left_i = ccast_x[0, -1]
+            # # upper_left_j = ccast_y[0, -1]
+            # # upper_right_i = ccast_x[-1, -1]
+            # # upper_right_j = ccast_y[-1, -1]
+
+            # print(f"upper_left ({upper_left_i}, {upper_left_j}) .... ({upper_right_i}, {upper_right_j}) upper_right")
+            # print(f"lower_left ({lower_left_i}, {lower_left_j}) .... ({lower_right_i}, {lower_right_j}) lower_right")
+            # print()
+            # print(f"ccast_x: [{np.amin(ccast_x)}, ... {np.amax(ccast_x)}]")
+            # print(f"ccast_y: [{np.amin(ccast_y)}, ... {np.amax(ccast_y)}]")
+
+            # # [ii, jj]
+            # #   upper_left (1323, 3506) .... (1300, 3165) upper_right
+            # #
+            # #   lower_left (2057, 3553) .... (1982, 3204) lower_right
+            # #
+            # #   ccast_x: [1300, ... 2057] 2057-1300=757
+            # #   ccast_y: [3165, ... 3570] 3570-3165=405
+            # #
+            # #   upper_left (1597714, 4952165) .... (1666723, 3929027) upper_right
+            # #   lower_left (-604581, 5093184) .... (-379551, 4046043) lower_right
+            # #
+            # #   ccast_x: [-604581, ... 1666723]
+            # #   ccast_y: [3929027, ... 5144191]
+
+            # # [jj, ii]
+            # #   upper_left (1982, 3204) .... (1300, 3165) upper_right
+            # #   lower_left (2057, 3553) .... (1323, 3506) lower_right
+            # #
+            # #   ccast_x: [1300, ... 2057] 2057-1300=757
+            # #   ccast_y: [3165, ... 3570] 3570-3165=405
+            # #
+            # #   upper_left (-379551.09851074027, 4046043.657592753) .... (1666723.7994384738, 3929027.937622063) upper_right
+            # #   lower_left (-604581.3292236318,  5093184.331176753) .... (1597714.5286865155, 4952165.386596654) lower_right
+            # #
+            # #   ccast_x: [-604581.329223633, ... 1666723.7994384798]
+            # #   ccast_y: [3929027.9376220573, ... 5144191.18347169]
+
+            os._exit(1)
 
             # data_vals = data_vals.astype(np.uint16)
             # print(data_vals)

@@ -7,6 +7,7 @@ src/cfg/__init__
 """
 # Local Imports
 from .setup_msg import setup_msg
+from .setup_era5 import setup_era5
 
 # Define Global Constants and State Variables
 # -------------------------------------------
