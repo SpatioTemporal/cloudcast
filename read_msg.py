@@ -222,9 +222,10 @@ if mod_t_files:
 
     ##
     # Run ERA5 setup
-    do_dir = f"{t_src_dir}{t_years[0]:4d}/{t_levs[0]}/"
+    use_lev = 3
+    do_dir = f"{t_src_dir}{t_years[0]:4d}/{t_levs[use_lev]}/"
     do_file = sorted([f"{do_dir}{_}" for _ in os.listdir(do_dir) if _.endswith('.nc')])[0]
-    setup_era5(do_file)
+    setup_era5(do_file, str(t_years[0]), str(t_levs[use_lev]))
 
     #
     os._exit(1)
