@@ -103,9 +103,11 @@ def main(make_tif: bool, read_nat: bool, make_fig: bool, use_nat: bool, zip2nat:
         read_spatial = [False, True][0]
         do_stats = [False, True][0]
         make_animation = [False, True][0]
+        fuze_years = [False, True][1]
         if make_animation:
             read_spatial = False
             do_stats = False
+            fuze_years = False
 
         ##
         # Run ERA5 setup
@@ -147,7 +149,7 @@ def main(make_tif: bool, read_nat: bool, make_fig: bool, use_nat: bool, zip2nat:
         #              ('T500', 2017), ('T500', 2018),
         #              ('T250', 2017), ('T250', 2018)]
         done_this = []
-        done_this = [('T850', 2017)]
+        # done_this = [('T850', 2017)]
         for do_lev in t_levs:
             for do_yr in t_years:
                 check_done = (do_lev, do_yr)
@@ -193,6 +195,57 @@ def main(make_tif: bool, read_nat: bool, make_fig: bool, use_nat: bool, zip2nat:
 
                 spatial_file = do_file.replace(".nc", "_spatial.npz")
                 final_file = do_file.replace(".nc", "_ccast.npz")
+
+                if fuze_years:
+                    if do_yr == 2018:
+                        continue
+                    first_step = 35036
+                    first_file = spatial_file.replace(".npz", f"_{first_step:04d}.npz")
+                    # print(f"Reading {first_file}")
+                    b_ds = np.load(first_file)
+                    first_temp = b_ds['arr_0']
+                    del b_ds
+
+                    last_file = spatial_file.replace(".npz", f"_0000.npz")
+                    last_file = last_file.replace("2017", "2018")
+                    # print(f"Reading {last_file}")
+                    b_ds = np.load(last_file)
+                    last_temp = b_ds['arr_0']
+                    del b_ds
+
+                    n15_file = first_file.replace(f"{first_step:04d}", f"{first_step + 1:04d}")
+                    n30_file = first_file.replace(f"{first_step:04d}", f"{first_step + 2:04d}")
+                    n45_file = first_file.replace(f"{first_step:04d}", f"{first_step + 3:04d}")
+                    # print(f"{n15_file} -> {n30_file} -> {n45_file}")
+
+                    temp_15 = np.zeros((CCAST_HEIGHT, CCAST_WIDTH), dtype=float)
+                    temp_30 = np.zeros((CCAST_HEIGHT, CCAST_WIDTH), dtype=float)
+                    temp_45 = np.zeros((CCAST_HEIGHT, CCAST_WIDTH), dtype=float)
+
+                    ##
+                    # Pixel by Pixel linear fit over time insert 15, 30, 45
+                    for jj in range(CCAST_HEIGHT):
+                        for ii in range(CCAST_WIDTH):
+                            start_temp = first_temp[jj, ii]
+                            end_temp = last_temp[jj, ii]
+                            slope = end_temp - start_temp
+                            # print(f"\t\t{jj = :3d} {ii = :3d} {start_temp:10.5f} -> {end_temp:10.5f}\tslope = {slope}")
+                            ##
+                            # Linear Fit
+                            temp_15[jj, ii] = (slope * 0.25) + start_temp
+                            temp_30[jj, ii] = (slope * 0.5) + start_temp
+                            temp_45[jj, ii] = (slope * 0.75) + start_temp
+                            # print(f"\t\t\t{start_temp:10.5f} {temp_15[jj, ii]:10.5f} {temp_30[jj, ii]:10.5f} {temp_45[jj, ii]:10.5f} {end_temp:10.5f}")
+                            # break
+                        # break
+                    np.savez_compressed(n15_file, temp_15)
+                    np.savez_compressed(n30_file, temp_30)
+                    np.savez_compressed(n45_file, temp_45)
+
+                    if do_lev == 'T250':
+                        return
+                    else:
+                        continue
 
                 ##
                 # Read raw Netcdf file
@@ -306,6 +359,11 @@ def main(make_tif: bool, read_nat: bool, make_fig: bool, use_nat: bool, zip2nat:
                     print(f"\tDone {len(done_files)} of {len(list(range(ccast_tsteps)))}")
                     print("Done Interpolation Animation")
                     return
+
+                if do_stats or make_animation or fuze_years:
+                    done_this.append(check_done)
+                    continue
+
                 ##
                 # Interpolate ERA-5 to MSG CloudCast
                 #   [tsteps, nlats, nlons] -> [ccast_tsteps, CCAST_HEIGHT, CCAST_WIDTH]
