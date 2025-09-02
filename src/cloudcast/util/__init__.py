@@ -12,6 +12,7 @@ from .natread import natread
 from .find_grid_area import find_grid_area
 from .calculate_solar_angles import calculate_solar_angles
 from .read_era5 import read_era5
+from .spatial_downscale import spatial_downscale
 
 # Define Global Constants and State Variables
 # -------------------------------------------
